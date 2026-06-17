@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.croc.CrocGUI</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Croc GUI</name>
+  <summary>Secure file transfers made beautiful</summary>
+  <description>
+    <p>
+      Croc GUI is a modern GTK4/Libadwaita frontend for the croc command-line tool, 
+      making secure peer-to-peer file transfers simple and elegant.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Send files, folders, and text snippets with a simple drag-and-drop interface</li>
+      <li>Receive transfers using codes or by scanning QR images</li>
+      <li>Adaptive layout that works on desktop and mobile devices</li>
+      <li>Built-in QR code generation for easy sharing</li>
+      <li>Comprehensive settings for power users</li>
+      <li>Full integration with GNOME and other desktop environments</li>
+    </ul>
+    <p>
+      All transfers are end-to-end encrypted and work across different networks 
+      and platforms. No registration or third-party accounts required.
+    </p>
+  </description>
+  
+  <launchable type="desktop-id">org.croc.CrocGUI.desktop</launchable>
+  <provides>
+    <binary>croc-gui</binary>
+  </provides>
+  
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/yourname/croc-gui/main/data/screenshots/send-page.png</image>
+      <caption>Send files, folders, and text with drag-and-drop simplicity</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/yourname/croc-gui/main/data/screenshots/receive-page.png</image>
+      <caption>Receive transfers using codes or QR scanning</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/yourname/croc-gui/main/data/screenshots/preferences.png</image>
+      <caption>Comprehensive settings for advanced configuration</caption>
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://github.com/yourname/croc-gui</url>
+  <url type="bugtracker">https://github.com/yourname/croc-gui/issues</url>
+  <url type="vcs-browser">https://github.com/yourname/croc-gui</url>
+  <url type="translate">https://github.com/yourname/croc-gui/wiki/Translation</url>
+  
+  <developer_name>Your Name</developer_name>
+  <update_contact>your-email@example.com</update_contact>
+  
+  <content_rating type="oars-1.1" />
+  
+  <releases>
+    <release version="1.2" date="2025-01-20">
+      <description>
+        <p>This release fixes several critical bugs and improves stability:</p>
+        <ul>
+          <li>Fixed thread-safety issues in subprocess handling</li>
+          <li>Unified global flag construction for send and receive</li>
+          <li>Added proper error logging throughout the application</li>
+          <li>Improved HIG compliance with libadwaita dialogs</li>
+          <li>Better handling of QR generation and scanning errors</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+  
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  
+  <recommends>
+    <display_length compare="ge">768</display_length>
+  </recommends>
+</component>

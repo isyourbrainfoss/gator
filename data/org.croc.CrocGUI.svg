@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder SVG icon for org.croc.CrocGUI -->
+<!-- Replace this with a proper app icon designed according to GNOME HIG -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3584e4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1c71d8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="56" fill="url(#bg)" stroke="#1a5fb4" stroke-width="4"/>
+  
+  <!-- Transfer arrow symbol -->
+  <g fill="white" stroke="none">
+    <!-- Left arrow (send) -->
+    <path d="M30 45 L50 35 L50 41 L70 41 L70 49 L50 49 L50 55 Z"/>
+    <!-- Right arrow (receive) -->
+    <path d="M98 83 L78 93 L78 87 L58 87 L58 79 L78 79 L78 73 Z"/>
+    <!-- Connection line -->
+    <rect x="45" y="62" width="38" height="4" rx="2"/>
+  </g>
+  
+  <!-- Decorative dots -->
+  <circle cx="40" cy="64" r="3" fill="rgba(255,255,255,0.7)"/>
+  <circle cx="64" cy="64" r="3" fill="rgba(255,255,255,0.7)"/>
+  <circle cx="88" cy="64" r="3" fill="rgba(255,255,255,0.7)"/>
+</svg>

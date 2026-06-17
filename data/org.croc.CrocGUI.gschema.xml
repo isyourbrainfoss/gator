@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="croc-gui">
+  <schema id="org.croc.CrocGUI" path="/org/croc/CrocGUI/">
+    <!-- Appearance -->
+    <key name="color-scheme" type="s">
+      <default>'default'</default>
+      <summary>Color scheme</summary>
+      <choices>
+        <choice value='default'/>
+        <choice value='light'/>
+        <choice value='dark'/>
+      </choices>
+    </key>
+
+    <!-- Receiving -->
+    <key name="save-dir" type="s">
+      <default>''</default>
+      <summary>Default folder for received files</summary>
+    </key>
+    <key name="yes" type="b">
+      <default>false</default>
+      <summary>Automatically accept incoming transfers (--yes)</summary>
+    </key>
+    <key name="overwrite" type="b">
+      <default>false</default>
+      <summary>Overwrite existing files without prompt</summary>
+    </key>
+
+    <!-- General -->
+    <key name="debug" type="b"><default>false</default></key>
+    <key name="no-compress" type="b"><default>false</default></key>
+    <key name="ask" type="b"><default>false</default></key>
+    <key name="local" type="b"><default>false</default></key>
+    <key name="internal-dns" type="b"><default>false</default></key>
+    <key name="multicast" type="s"><default>'239.255.255.250'</default></key>
+    <key name="ip" type="s"><default>''</default></key>
+    <key name="throttle-upload" type="s"><default>''</default></key>
+
+    <!-- Relay/Proxy -->
+    <key name="relay" type="s"><default>'37.27.244.215:9009'</default></key>
+    <key name="relay6" type="s"><default>'[2a01:4f9:c013:7b04::1]:9009'</default></key>
+    <key name="pass" type="s"><default>''</default></key>
+    <key name="socks5" type="s"><default>''</default></key>
+    <key name="connect" type="s"><default>''</default></key>
+
+    <!-- Sending -->
+    <key name="default-code" type="s"><default>''</default></key>
+    <key name="hash" type="s"><default>'xxhash'</default></key>
+    <key name="zip-folder" type="b"><default>false</default></key>
+    <key name="no-local" type="b"><default>false</default></key>
+    <key name="no-multi" type="b"><default>false</default></key>
+    <key name="git" type="b"><default>false</default></key>
+    <key name="port" type="i"><default>9009</default><range min="1" max="65535"/></key>
+    <key name="transfers" type="i"><default>4</default><range min="1" max="100"/></key>
+    <key name="qr" type="b"><default>false</default></key>
+  </schema>
+</schemalist>

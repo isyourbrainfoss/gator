@@ -1,0 +1,64 @@
+# Flatpak manifest for Croc GUI
+# Build with: flatpak-builder --user --install --force-clean build-dir org.croc.CrocGUI.yml
+#
+# Notes:
+# - Bundles its own croc binary so no host dependency.
+# - Uses GNOME runtime (matches libadwaita requirements).
+# - Python modules installed via pip in the build.
+id: org.croc.CrocGUI
+runtime: org.gnome.Platform
+runtime-version: "47"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.golang  # for building croc (Go)
+command: croc-gui
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=xdg-download
+  - --filesystem=xdg-pictures  # for QR scan
+  - --talk-name=org.freedesktop.Notifications
+
+modules:
+  # --- croc (Go) -------------------------------------------------------------
+  - name: croc
+    buildsystem: simple
+    build-commands:
+      - |
+        export GOBIN=$PWD/bin
+        export PATH=$GOBIN:$PATH
+        go build -o $FLATPAK_DEST/bin/croc .
+    sources:
+      - type: git
+        url: https://github.com/schollz/croc.git
+        tag: v10.4.4
+        commit: 8c3e0e3e4a0a8e0e2f1c3d4e5f6a7b8c9d0e1f2a3  # placeholder; update on real build
+        # In real use replace commit with actual for the tag.
+    # Simpler: use archive if tag known
+    # - type: archive
+    #   url: https://github.com/schollz/croc/archive/refs/tags/v10.4.4.tar.gz
+    #   sha256: ...
+
+  # --- Python deps (PyGObject is in runtime, qrcode/PIL optional) ----------
+  - name: python-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=$FLATPAK_DEST qrcode[pil] pyzbar
+    sources: []
+
+  # --- Croc GUI itself ------------------------------------------------------
+  - name: croc-gui
+    buildsystem: meson
+    config-opts:
+      - -Dprefix=/app
+    sources:
+      - type: dir
+        path: .
+    post-install:
+      # Ensure the entry point is executable
+      - chmod +x /app/bin/croc-gui || true
+
+  # Optional: update icon cache etc handled by gnome post-install in meson

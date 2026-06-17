@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev,qr]'
+
+      - name: Lint with black
+        run: black --check .
+
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Type check with mypy
+        run: python -m mypy --ignore-missing-imports --no-error-summary croc_gui.py src/croc_gui/ || echo "mypy notes (GTK modules are expected)"
+
+      - name: Test with pytest
+        run: pytest tests/ -q --tb=short

@@ -31,7 +31,7 @@ from typing import Any
 
 from gi.repository import GLib
 
-from settings import (
+from .settings import (
     CODE_IS_PREFIX,
     CROC_BINARY,
     DEFAULT_MULTICAST,

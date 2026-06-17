@@ -2,7 +2,10 @@
 
 from unittest.mock import patch
 
-import settings as S
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import croc_gui.settings as S
 
 
 def test_defaults_present():

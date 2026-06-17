@@ -9,27 +9,10 @@ gnome = import('gnome')
 python = import('python3').find_installation('python3', required: true)
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())
 
-# Python sources (installed as a package)
+# Python sources (installed as a package from src layout)
 install_subdir(
-  '.',
+  'src/croc_gui',
   install_dir: python.get_install_dir(),
-  exclude_files: [
-    'meson.build',
-    'TASKS.md',
-    'AGENTS.md',
-    'README.md',
-    'pyproject.toml',
-    'data',
-    'tests',
-    '.gitignore',
-  ],
-  exclude_directories: [
-    '__pycache__',
-    'croc_gui.egg-info',
-    'tests',
-    'data',
-    '.git',
-  ],
 )
 
 # Install a small launcher script so "croc-gui" works from PATH

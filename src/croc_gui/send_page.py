@@ -16,7 +16,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk, Pango
 
 if TYPE_CHECKING:
-    from croc_gui import CrocGUI
+    from .app import CrocGUI
 
 
 class SendPage(Gtk.ScrolledWindow):

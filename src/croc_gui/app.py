@@ -25,30 +25,24 @@ import logging
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from receive_page import ReceivePage
-from send_page import SendPage
-from settings import (
+from .receive_page import ReceivePage
+from .send_page import SendPage
+from .settings import (
     APP_ID,
     APP_NAME,
     APP_VERSION,
     CROC_BINARY,
     DEFAULT_PORT,
     DEFAULT_TRANSFERS,
+    CrocSettings,
     get_default_save_dir,
-    validate_settings,
 )
-from settings import (
-    load_settings as _load_settings,
-)
-from settings import (
-    save_settings as _save_settings,
-)
-from transfer import CrocReceiveTransfer, CrocSendTransfer
+from .transfer import CrocReceiveTransfer, CrocSendTransfer
 
 logger = logging.getLogger(__name__)
 
 # ── Optional QR support ───────────────────────────────────────────────────────
-from qr import HAS_QR_GEN, HAS_QR_SCAN, generate_qr_texture, scan_qr_from_image_path
+from .qr import HAS_QR_GEN, HAS_QR_SCAN, generate_qr_texture, scan_qr_from_image_path
 
 
 class CrocGUI(Adw.Application):
@@ -68,9 +62,8 @@ class CrocGUI(Adw.Application):
         self._send_transfer: CrocSendTransfer | None = None
         self._receive_transfer: CrocReceiveTransfer | None = None
 
-        # Config (delegates to settings module for load/JSON)
-        raw = _load_settings()
-        self.settings = validate_settings(raw)
+        # Config - now uses GSettings when available (with JSON fallback)
+        self.settings = CrocSettings()
 
         # Apply saved theme
         self.apply_color_scheme()
@@ -96,14 +89,13 @@ class CrocGUI(Adw.Application):
             self.set_accels_for_action(f"app.{name}", accels)
 
     def load_settings(self) -> dict[str, Any]:
-        """Thin wrapper for backwards compatibility inside the class."""
-        raw = _load_settings()
-        return validate_settings(raw)
+        """Return snapshot of current settings."""
+        return dict(self.settings)
 
     def save_settings(self) -> None:
-        """Persist via the settings module; surface errors as toasts."""
+        """Persist current settings (GSettings or JSON)."""
         try:
-            _save_settings(self.settings)
+            self.settings.save()
         except Exception as e:  # defensive
             logger.error("Could not save settings: %s", e)
             GLib.idle_add(self.add_toast, "Warning: settings could not be saved")
@@ -598,7 +590,7 @@ class CrocGUI(Adw.Application):
 
     def on_reset_settings(self) -> None:
         """Clear all persisted settings and restore UI to defaults."""
-        self.settings = {}
+        self.settings.clear()
         self.save_settings()
         self.apply_color_scheme()
         default_save_dir = get_default_save_dir()

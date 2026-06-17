@@ -46,11 +46,11 @@ Changelog = "https://github.com/yourname/croc-gui/blob/main/TASKS.md"
 [project.scripts]
 croc-gui = "croc_gui:main"
 
-[project.gui-scripts] 
+[project.gui-scripts]
 croc-gui = "croc_gui:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["croc_gui*"]
 
 [tool.black]

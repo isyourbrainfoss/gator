@@ -4,10 +4,17 @@
 
 ```bash
 # Development setup
-pip install -e .[qr,dev]
+pip install -e '.[qr,dev]'
 
 # Run application directly (development)
 python3 croc_gui.py
+
+# On Sway / non-GNOME (to avoid portal warnings)
+GTK_USE_PORTAL=0 python3 croc_gui.py
+
+# Flatpak build test
+flatpak-builder --user --install --force-clean build-dir org.croc.CrocGUI.yml
+flatpak run org.croc.CrocGUI
 
 # Code quality (all must pass)
 black .
@@ -17,7 +24,6 @@ python3 -m mypy --ignore-missing-imports --no-error-summary croc_gui.py transfer
 # Installation testing
 pip install -e .
 croc-gui
-```
 
 ## Architecture
 

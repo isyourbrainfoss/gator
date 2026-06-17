@@ -19,18 +19,35 @@ A modern GTK4/Libadwaita frontend for [croc](https://github.com/schollz/croc) â€
 - **Python 3.10+** with PyGObject
 - **GTK 4** and **libadwaita 1.4+**
 
-### From Source
+### From Source (development)
 
 ```bash
 git clone https://github.com/yourname/croc-gui.git
 cd croc-gui
-pip install -e .
+pip install -e '.[qr,dev]'
 
-# Optional QR support:
-pip install -e .[qr]
+# Run directly:
+python3 croc_gui.py
 
-# Run:
+# Or after install:
 croc-gui
+```
+
+### Flatpak (for release / distribution)
+
+See `org.croc.CrocGUI.yml`.
+
+Build locally:
+
+```bash
+flatpak-builder --user --install --force-clean build-dir org.croc.CrocGUI.yml
+flatpak run org.croc.CrocGUI
+```
+
+For a polished Flathub release you will also want:
+- Real screenshots in the metainfo
+- A high-quality app icon (replace `data/org.croc.CrocGUI.svg`)
+- Consider migrating settings to GSettings (stub schema already present)
 ```
 
 ### Development

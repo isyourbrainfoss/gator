@@ -31,6 +31,8 @@
   </provides>
   
   <screenshots>
+    <!-- Replace with real screenshots before Flathub submission.
+         Recommended size: 1600x900 or 1200x675 PNG, hosted publicly. -->
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/yourname/croc-gui/main/data/screenshots/send-page.png</image>
       <caption>Send files, folders, and text with drag-and-drop simplicity</caption>

@@ -8,8 +8,9 @@ version = "1.2"
 description = "Modern GTK4/Libadwaita frontend for croc secure file transfers"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
+license-files = ["LICENSE"]
 authors = [
-    {name = "Your Name", email = "your-email@example.com"}
+    {name = "Croc GUI Contributors"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -40,6 +41,7 @@ dev = ["mypy", "black", "ruff", "pytest"]
 Homepage = "https://github.com/yourname/croc-gui"
 Repository = "https://github.com/yourname/croc-gui.git"
 "Bug Tracker" = "https://github.com/yourname/croc-gui/issues"
+Changelog = "https://github.com/yourname/croc-gui/blob/main/TASKS.md"
 
 [project.scripts]
 croc-gui = "croc_gui:main"
@@ -67,7 +69,8 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "T20"]
 "send_page.py" = ["E402", "E501"]
 "receive_page.py" = ["E402", "E501"]
 "transfer.py" = ["E501"]  # a couple of long logical lines are acceptable
-"tests/*" = ["N812", "F401", "N999"]  # test imports often alias lower or use for fixtures; package naming
+"tests/*" = ["N812", "F401", "N999"]
+"__init__.py" = ["N999"]  # directory name "Croc" (capital) for the workspace; harmless
 
 [tool.mypy]
 python_version = "3.10"

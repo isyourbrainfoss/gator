@@ -22,34 +22,52 @@ finish-args:
   - --filesystem=xdg-pictures  # for QR scan
   - --talk-name=org.freedesktop.Notifications
 
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /man
+  - /share/doc
+  - /share/man
+  - '*.a'
+  - '*.la'
+
 modules:
   # --- croc (Go) -------------------------------------------------------------
+  # Use archive + exact sha for reproducibility (required for Flathub)
   - name: croc
     buildsystem: simple
+    build-options:
+      env:
+        GOPROXY: https://proxy.golang.org
     build-commands:
       - |
-        export GOBIN=$PWD/bin
-        export PATH=$GOBIN:$PATH
+        export PATH=/usr/lib/sdk/golang/bin:$PATH
         go build -o $FLATPAK_DEST/bin/croc .
     sources:
-      - type: git
-        url: https://github.com/schollz/croc.git
-        tag: v10.4.4
-        commit: 8c3e0e3e4a0a8e0e2f1c3d4e5f6a7b8c9d0e1f2a3  # placeholder; update on real build
-        # In real use replace commit with actual for the tag.
-    # Simpler: use archive if tag known
-    # - type: archive
-    #   url: https://github.com/schollz/croc/archive/refs/tags/v10.4.4.tar.gz
-    #   sha256: ...
+      - type: archive
+        url: https://github.com/schollz/croc/archive/refs/tags/v10.4.4.tar.gz
+        sha256: 33e9160829705942178a017ce055196c4a66c9ef5cdfe8029e840be835e756d4
+        strip-components: 1
 
-  # --- Python deps (PyGObject is in runtime, qrcode/PIL optional) ----------
-  - name: python-deps
+  # --- Optional Python QR deps (PyGObject + GTK from GNOME runtime) ------
+  # Note: pillow and pyzbar may require additional -devel packages on the SDK
+  # for a full build. For Flathub this often pulls wheels or we can vendor.
+  - name: python-qr-deps
     buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
     build-commands:
-      - pip3 install --prefix=$FLATPAK_DEST qrcode[pil] pyzbar
+      - pip3 install --verbose --prefix=$FLATPAK_DEST --no-deps --no-build-isolation qrcode[pil] pyzbar
     sources: []
 
   # --- Croc GUI itself ------------------------------------------------------
+  # For local testing with flatpak-builder use type: dir
+  # For Flathub / release, switch to:
+  #   - type: git
+  #     url: https://github.com/.../croc-gui.git
+  #     tag: ...
+  #     commit: ...
   - name: croc-gui
     buildsystem: meson
     config-opts:
@@ -60,5 +78,6 @@ modules:
     post-install:
       # Ensure the entry point is executable
       - chmod +x /app/bin/croc-gui || true
+      - install -Dm644 data/org.croc.CrocGUI.svg /app/share/icons/hicolor/scalable/apps/org.croc.CrocGUI.svg || true
 
-  # Optional: update icon cache etc handled by gnome post-install in meson
+  # Schemas etc are handled in the meson post-install step above

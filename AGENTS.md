@@ -16,7 +16,7 @@ flatpak run org.croc.CrocGUI
 # Code quality (all must pass)
 black .
 ruff check .
-python3 -m mypy --ignore-missing-imports --no-error-summary croc_gui.py transfer.py || echo "(mypi notes for gi + optional strictness are pre-existing)"
+python3 -m mypy --ignore-missing-imports --no-error-summary src/croc_gui/ || echo "(mypi notes for gi + optional strictness are pre-existing)"
 
 # Installation testing
 pip install -e .

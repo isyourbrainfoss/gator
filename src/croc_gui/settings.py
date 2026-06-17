@@ -184,8 +184,12 @@ class CrocSettings(dict):
 
         try:
             from gi.repository import Gio
+
             source = Gio.SettingsSchemaSource.get_default()
-            if source is not None and source.lookup(GSETTINGS_SCHEMA_ID, True) is not None:
+            if (
+                source is not None
+                and source.lookup(GSETTINGS_SCHEMA_ID, True) is not None
+            ):
                 self._gsettings = Gio.Settings.new(GSETTINGS_SCHEMA_ID)
             else:
                 raise RuntimeError("GSettings schema not installed")
@@ -244,7 +248,9 @@ class CrocSettings(dict):
                 elif isinstance(value, (int, float)):
                     self._gsettings.set_int(gkey, int(value))
                 else:
-                    self._gsettings.set_string(gkey, str(value) if value is not None else "")
+                    self._gsettings.set_string(
+                        gkey, str(value) if value is not None else ""
+                    )
                 return
             except Exception as e:
                 logger.warning("GSettings write failed for %s: %s", key, e)

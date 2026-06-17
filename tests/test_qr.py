@@ -2,8 +2,14 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from croc_gui.qr import HAS_QR_GEN, HAS_QR_SCAN, generate_qr_texture, scan_qr_from_image_path
+from croc_gui.qr import (
+    HAS_QR_GEN,
+    HAS_QR_SCAN,
+    generate_qr_texture,
+    scan_qr_from_image_path,
+)
 
 
 def test_flags_are_bools():
@@ -13,7 +19,7 @@ def test_flags_are_bools():
 
 def test_generate_graceful_without_deps(monkeypatch):
     # Even if deps present, we can force off for test of path
-    monkeypatch.setattr("qr.HAS_QR_GEN", False)
+    monkeypatch.setattr("croc_gui.qr.HAS_QR_GEN", False)
     assert generate_qr_texture("hello", False) is None
 
 

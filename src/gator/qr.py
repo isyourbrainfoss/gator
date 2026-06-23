@@ -49,6 +49,13 @@ def generate_qr_texture(code: str, is_dark: bool) -> Any | None:
 
 
 # Scanning
+# Help pyzbar find libzbar in Flatpak / custom prefixes
+import os
+
+_lib_path = os.environ.get("LD_LIBRARY_PATH", "")
+if "/app/lib" not in _lib_path:
+    os.environ["LD_LIBRARY_PATH"] = "/app/lib:" + _lib_path
+
 try:
     from pyzbar.pyzbar import decode  # type: ignore
 

@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from croc_gui.transfer import CrocReceiveTransfer, CrocSendTransfer, build_global_args
+from gator.transfer import CrocReceiveTransfer, CrocSendTransfer, build_global_args
 
 
 def test_build_global_args_basic():

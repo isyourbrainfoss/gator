@@ -1,11 +1,11 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Croc GUI
+Name=Gator
 Comment=Modern GTK4 frontend for secure file transfers
 Comment[es]=Interfaz GTK4 moderna para transferencias seguras de archivos
-Exec=croc-gui
-Icon=org.croc.CrocGUI
+Exec=gator
+Icon=org.gator.Gator
 Terminal=false
 Categories=Network;FileTransfer;GTK;GNOME;
 Keywords=file;transfer;send;receive;secure;p2p;croc;

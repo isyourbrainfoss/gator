@@ -1,7 +1,7 @@
 """receive_page.py – Receive tab extracted into a widget subclass.
 
 See send_page.py for rationale.  Widget references are poked back onto the
-owning CrocGUI instance.
+owning GatorApp instance.
 """
 
 from __future__ import annotations
@@ -15,13 +15,13 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk
 
 if TYPE_CHECKING:
-    from .app import CrocGUI
+    from .app import GatorApp
 
 
 class ReceivePage(Gtk.ScrolledWindow):
     """Encapsulates the entire "Receive" page UI."""
 
-    def __init__(self, app: CrocGUI) -> None:
+    def __init__(self, app: GatorApp) -> None:
         super().__init__()
         # Use AUTOMATIC horizontally so the page can shrink below its natural width
         # on narrow windows (prevents AdwToastOverlay "exceeds" warnings).
@@ -70,7 +70,7 @@ class ReceivePage(Gtk.ScrolledWindow):
         scan_box.append(Gtk.Label(label="Scan QR from Image"))
         scan_btn.set_child(scan_box)
         scan_btn.connect("clicked", self.app.on_scan_qr_image)
-        self.app.scan_btn = scan_btn  # exposed for post-config in CrocGUI
+        self.app.scan_btn = scan_btn  # exposed for post-config in GatorApp
         self.app.receive_btn_box.append(scan_btn)
         form.append(self.app.receive_btn_box)
 
@@ -83,16 +83,6 @@ class ReceivePage(Gtk.ScrolledWindow):
         change_btn.connect("clicked", self.app.on_change_folder)
         self.app.folder_row.add_suffix(change_btn)
         form.append(self.app.folder_row)
-
-        # Shell toggle for receive
-        toggles_group = Adw.PreferencesGroup()
-        self.app.receive_shell_toggle_row = Adw.SwitchRow(title="Show shell output")
-        self.app.receive_shell_toggle_row.set_active(True)
-        self.app.receive_shell_toggle_row.connect(
-            "notify::active", self.app.on_shell_toggle_changed_receive
-        )
-        toggles_group.add(self.app.receive_shell_toggle_row)
-        form.append(toggles_group)
 
         controls = Gtk.CenterBox()
         self.app.receive_start_btn = Gtk.Button()
@@ -135,6 +125,7 @@ class ReceivePage(Gtk.ScrolledWindow):
             right_margin=12,
         )
         log_scroll.set_child(self.app.receive_log)
+        log_scroll.set_visible(self.app.settings.get("show_shell_output", False))
         outer.append(log_scroll)
         self.app.receive_log_scroll = log_scroll
 

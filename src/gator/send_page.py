@@ -1,7 +1,7 @@
 """send_page.py – Send tab extracted into a widget subclass.
 
 _build_send_page logic has been moved here.  To keep the controller code
-in CrocGUI unchanged we assign created widgets back onto app (e.g.
+in GatorApp unchanged we assign created widgets back onto app (e.g.
 app.files_listbox, app.send_log, ...).  The page owns the tree.
 """
 
@@ -16,18 +16,18 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk, Pango
 
 if TYPE_CHECKING:
-    from .app import CrocGUI
+    from .app import GatorApp
 
 
 class SendPage(Gtk.ScrolledWindow):
     """Encapsulates the entire "Send" page UI.
 
-    After construction, the owning CrocGUI instance has many of its
+    After construction, the owning GatorApp instance has many of its
     ``self.xxx`` widget references populated so existing handler methods
     continue to work.
     """
 
-    def __init__(self, app: CrocGUI) -> None:
+    def __init__(self, app: GatorApp) -> None:
         super().__init__()
         # Use AUTOMATIC horizontally so the page can shrink below its natural width
         # on narrow windows (prevents AdwToastOverlay "exceeds" warnings).
@@ -183,21 +183,6 @@ class SendPage(Gtk.ScrolledWindow):
         drop_target.connect("drop", self.app.on_drop_file)
         self.app.files_listbox.add_controller(drop_target)
 
-        # Toggles group
-        toggles_group = Adw.PreferencesGroup()
-        self.app.qr_toggle_row = Adw.SwitchRow(title="Show QR image")
-        self.app.qr_toggle_row.set_active(True)
-        self.app.qr_toggle_row.connect("notify::active", self.app.on_qr_toggle_changed)
-        toggles_group.add(self.app.qr_toggle_row)
-
-        self.app.shell_toggle_row = Adw.SwitchRow(title="Show shell output")
-        self.app.shell_toggle_row.set_active(True)
-        self.app.shell_toggle_row.connect(
-            "notify::active", self.app.on_shell_toggle_changed_send
-        )
-        toggles_group.add(self.app.shell_toggle_row)
-        form.append(toggles_group)
-
         # Controls
         controls = Gtk.CenterBox()
         self.app.send_start_btn = Gtk.Button()
@@ -251,7 +236,7 @@ class SendPage(Gtk.ScrolledWindow):
         self.app.qr_picture = Gtk.Picture(content_fit=Gtk.ContentFit.SCALE_DOWN)
         self.app.qr_picture.set_size_request(256, 256)
         self.app.qr_picture.add_css_class("card")
-        self.app.qr_picture.set_visible(False)
+        self.app.qr_picture.set_visible(self.app.settings.get("show_qr_image", True))
         qr_clamp.set_child(self.app.qr_picture)
 
         self.app.transfer_info.append(self.app.code_box)
@@ -276,6 +261,7 @@ class SendPage(Gtk.ScrolledWindow):
         )
         self.app.send_log.get_buffer().create_tag("error", foreground="#ff5555")
         log_scroll.set_child(self.app.send_log)
+        log_scroll.set_visible(self.app.settings.get("show_shell_output", False))
         outer.append(log_scroll)
         self.app.send_log_scroll = log_scroll
 

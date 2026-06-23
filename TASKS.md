@@ -1,6 +1,7 @@
-# Croc GUI – Refactoring & Production Readiness Tasks
+# Gator – Refactoring & Production Readiness Tasks
 
-This document tracks the refactoring work needed to make Croc GUI production-ready
+This document tracks the refactoring work needed to make Gator production-ready
+(renamed from the former "Croc GUI" project)
 for Flathub submission. The original single-file app had several critical bugs and
 HIG violations that have been systematically addressed.
 
@@ -30,7 +31,7 @@ HIG violations that have been systematically addressed.
   with `Adw.AboutDialog` (libadwaita ≥ 1.5); falls back to `Adw.AboutWindow` on
   older runtimes.
 - [x] **Removed `Adw.init()`** – unnecessary with `Adw.Application`; deprecated in
-  libadwaita 1.6+.
+  libadwaita 1.7+ (GNOME 50 - freshest).
 - [x] **Replaced silent `except: pass` with logging** – `load_settings`,
   `save_settings`, QR generation, clipboard paste, QR scan, and the folder-open
   handler all now log warnings/errors and surface failures to the user via toasts
@@ -55,7 +56,7 @@ HIG violations that have been systematically addressed.
   `CrocSendTransfer` and `CrocReceiveTransfer` subclasses. All subprocess/thread
   logic moved out of the main Application class. Callbacks use `GLib.idle_add`
   for main-loop dispatch. Settings-only dependency enables unit testing without
-  GTK. Reduced `croc_gui.py` by ~150 lines.
+  GTK. Reduced `app.py` by ~150 lines.
 
 ---
 
@@ -78,7 +79,7 @@ HIG violations that have been systematically addressed.
   as preparation for Flatpak migration.
 - [x] **Extract `send_page.py` and `receive_page.py`** – UI construction moved
   into widget subclasses (SendPage / ReceivePage). Controller state and handlers
-  remain in CrocGUI for compatibility.
+  remain in Gator for compatibility.
 - [x] **Improve received-text detection** – replaced brittle "Receiving (<-"
   prefix + progress filter with:
   - directory snapshot before/after to decide file vs text
@@ -90,12 +91,12 @@ HIG violations that have been systematically addressed.
 
 ## Low Priority (P3) — completed
 
-- [x] **`.desktop` file** (`data/org.croc.CrocGUI.desktop`) – application launcher
+- [x] **`.desktop` file** (`data/org.gator.Gator.desktop`) – application launcher
   with proper categories, keywords, MIME type, and GNOME integration.
-- [x] **AppStream metainfo** (`data/org.croc.CrocGUI.metainfo.xml`) – complete
+- [x] **AppStream metainfo** (`data/org.gator.Gator.metainfo.xml`) – complete
   metainfo with description, screenshots, release notes, content rating, and
   all required Flathub fields.
-- [x] **SVG app icon stub** (`data/org.croc.CrocGUI.svg`) – placeholder icon with
+- [x] **SVG app icon stub** (`data/org.gator.Gator.svg`) – placeholder icon with
   transfer arrows. Should be replaced with a proper HIG-compliant design.
 - [x] **Python packaging** (`pyproject.toml`) – complete packaging metadata with
   optional dependencies, development tools, and entry points.
@@ -104,8 +105,8 @@ HIG violations that have been systematically addressed.
 
 - [x] **Meson build system** – `meson.build` + data launcher template. Installs
   desktop file, metainfo, scalable icon, gschema, Python sources.
-- [x] **Flatpak manifest** (`org.croc.CrocGUI.yml`) – bundles croc (Go build
-  module) + GUI. Uses GNOME 47 runtime.
+- [x] **Flatpak manifest** (`org.gator.Gator.yml`) – bundles croc (Go build
+  module) + GUI. Uses GNOME 50 runtime.
 - [x] **Unit tests** – Added `tests/test_settings.py`, `test_transfer.py`,
   `test_qr.py`. Pure logic only (no GTK). Run with `pytest`.
 - [x] **QR module** – extracted inline QR bits to `qr.py` (optional deps).
@@ -120,7 +121,7 @@ HIG violations that have been systematically addressed.
 - [ ] **Progress reporting** – parse croc's progress output and drive a
   `Gtk.ProgressBar` instead of a spinner.
 - [ ] **Resume / history** – store a transfer log with timestamps, file names, and
-  codes in `~/.local/share/croc-gui/`.
+  codes in `~/.local/share/gator/` (or `~/.config/gator/`).
 - [x] **Drag-and-drop to receive** – accept a dropped image file on the receive
   page (via ReceivePage) and run QR scan (bonus P4 item completed).
 - [ ] (remaining P4) Replace subprocess with Gio.Subprocess, progress bars, history.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Croc GUI – Modern adaptive GTK4/Libadwaita frontend for croc
-# © 2025 Your Name – GPL-3.0-or-later
-# https://github.com/yourname/croc-gui
-"""croc_gui – GTK4/Libadwaita graphical front-end for the croc file-transfer tool.
+# Gator – Modern adaptive GTK4/Libadwaita frontend for croc
+# © 2026 Gator Contributors – GPL-3.0-or-later
+# https://github.com/isyourbrainfoss/gator
+"""gator – GTK4/Libadwaita graphical front-end for the croc file-transfer tool.
 
 Single-file application; intended to be split into modules before Flathub
 submission (see TASKS.md).  All subprocess I/O runs on daemon threads; UI
@@ -34,7 +34,7 @@ from .settings import (
     CROC_BINARY,
     DEFAULT_PORT,
     DEFAULT_TRANSFERS,
-    CrocSettings,
+    GatorSettings,
     get_default_save_dir,
 )
 from .transfer import CrocReceiveTransfer, CrocSendTransfer
@@ -45,14 +45,25 @@ logger = logging.getLogger(__name__)
 from .qr import HAS_QR_GEN, HAS_QR_SCAN, generate_qr_texture, scan_qr_from_image_path
 
 
-class CrocGUI(Adw.Application):
+class GatorApp(Adw.Application):
     def __init__(self):
+        # Set this as early as possible to prevent libadwaita from complaining
+        # about the legacy gtk-application-prefer-dark-theme setting.
+        # This warning is especially common on non-GNOME Wayland compositors
+        # (Sway, etc.). Target is GNOME 50 (freshest) / libadwaita 1.7+.
+        try:
+            gtk_settings = Gtk.Settings.get_default()
+            if gtk_settings:
+                gtk_settings.set_property("gtk-application-prefer-dark-theme", False)
+        except Exception:
+            pass
+
         super().__init__(
             application_id=APP_ID,
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         GLib.set_application_name(APP_NAME)
-        GLib.set_prgname("croc-gui")
+        GLib.set_prgname("gator")
 
         # Runtime state
         self.selected_files: list[str] = []
@@ -63,9 +74,9 @@ class CrocGUI(Adw.Application):
         self._receive_transfer: CrocReceiveTransfer | None = None
 
         # Config - now uses GSettings when available (with JSON fallback)
-        self.settings = CrocSettings()
+        self.settings = GatorSettings()
 
-        # Apply saved theme
+        # Apply saved theme (this will also re-suppress the legacy setting)
         self.apply_color_scheme()
 
         self.save_dir = self.settings.get("save_dir") or get_default_save_dir()
@@ -103,11 +114,11 @@ class CrocGUI(Adw.Application):
     def apply_color_scheme(self) -> None:
         """Apply the saved color-scheme preference to the Adw.StyleManager.
 
-        We also explicitly turn off the legacy GtkSettings flag that libadwaita
-        complains about when it sees gtk-application-prefer-dark-theme.
+        We aggressively turn off the legacy GtkSettings flag. On some
+        compositors (Sway etc.) GTK or the portal can try to set it anyway,
+        which triggers this warning from libadwaita.
+        (Target: GNOME 50)
         """
-        # Suppress the "Using GtkSettings:gtk-application-prefer-dark-theme with
-        # libadwaita is unsupported" warning by disabling the legacy setting.
         try:
             gtk_settings = Gtk.Settings.get_default()
             if gtk_settings:
@@ -205,7 +216,7 @@ class CrocGUI(Adw.Application):
         menu_btn.set_tooltip_text("Menu")
         menu = Gio.Menu()
         menu.append("Preferences", "app.preferences")
-        menu.append("About Croc GUI", "app.about")
+        menu.append("About Gator", "app.about")
         menu.append("Quit", "app.quit")
         menu_btn.set_menu_model(menu)
         self.header.pack_end(menu_btn)
@@ -230,7 +241,7 @@ class CrocGUI(Adw.Application):
         # Post-configure optional QR scan button (disabled if pyzbar missing)
         if not HAS_QR_SCAN and hasattr(self, "scan_btn"):
             self.scan_btn.set_sensitive(False)
-            self.scan_btn.set_tooltip_text("pyzbar not installed")
+            self.scan_btn.set_tooltip_text("Requires libzbar (QR scan from image)")
 
         self.switcher.set_stack(self.stack)
 
@@ -359,7 +370,7 @@ class CrocGUI(Adw.Application):
 
     def show_preferences(self, *_) -> None:
         """Open the Preferences dialog (Adw.PreferencesDialog on libadwaita >= 1.5,
-        falling back to a plain Gtk.Window on older runtimes)."""
+        falling back to a plain Gtk.Window on older runtimes). Target: GNOME 50."""
         try:
             dlg = Adw.PreferencesDialog()
             dlg.set_title("Preferences")
@@ -412,6 +423,26 @@ class CrocGUI(Adw.Application):
             row.set_activatable_widget(radio)
             appearance.add(row)
         page.add(appearance)
+
+        # ── Interface ────────────────────────────────────────────────────────
+        interface = Adw.PreferencesGroup(title="Interface")
+        qr_row = self._make_switch_row(
+            "show_qr_image",
+            "Show QR image",
+            subtitle="Display the QR code for the generated transfer code",
+        )
+        qr_row.connect("notify::active", self.on_qr_toggle_changed)
+        interface.add(qr_row)
+
+        shell_row = self._make_switch_row(
+            "show_shell_output",
+            "Show shell output",
+            subtitle="Show detailed output from the croc command",
+        )
+        shell_row.connect("notify::active", self.on_shell_toggle_changed_send)
+        shell_row.connect("notify::active", self.on_shell_toggle_changed_receive)
+        interface.add(shell_row)
+        page.add(interface)
 
         # ── Receiving ────────────────────────────────────────────────────────
         receiving = Adw.PreferencesGroup(title="Receiving")
@@ -809,7 +840,7 @@ class CrocGUI(Adw.Application):
             tex = generate_qr_texture(code, is_dark)
             if tex:
                 self.qr_picture.set_paintable(tex)
-        self.qr_picture.set_visible(self.qr_toggle_row.get_active())
+        self.qr_picture.set_visible(self.settings.get("show_qr_image", True))
 
     def transfer_finished_send(self) -> None:
         """Reset the send UI after a transfer completes or is cancelled."""
@@ -1016,20 +1047,21 @@ class CrocGUI(Adw.Application):
 
     def show_about(self, *_: Any) -> None:
         """Show the About dialog (preferring Adw.AboutDialog if available)."""
-        # Adw.AboutDialog requires libadwaita >= 1.5 (GNOME 45).
-        # Fall back to Adw.AboutWindow on older runtimes.
+        # Adw.AboutDialog (preferred since libadwaita 1.5 / GNOME 45). Target GNOME 50 / 1.7+.
+        # Falls back to Adw.AboutWindow on older runtimes (still supported).
+        # Current target: GNOME 50 / libadwaita 1.7+ (freshest).
         common = {
             "application_name": APP_NAME,
             "version": APP_VERSION,
-            "developer_name": "Your Name",
-            "website": "https://github.com/yourname/croc-gui",
-            "issue_url": "https://github.com/yourname/croc-gui/issues",
-            "copyright": "© 2025 Your Name",
+            "developer_name": "Gator Contributors",
+            "website": "https://github.com/isyourbrainfoss/gator",
+            "issue_url": "https://github.com/isyourbrainfoss/gator/issues",
+            "copyright": "© 2026 Gator Contributors",
             "license_type": Gtk.License.GPL_3_0,
             "comments": "Modern GTK4/Libadwaita frontend for croc – secure file transfer made beautiful",
             "application_icon": APP_ID,
-            "developers": ["Your Name"],
-            "designers": ["Your Name"],
+            "developers": ["Gator Contributors"],
+            "designers": ["Gator Contributors"],
         }
         try:
             about = Adw.AboutDialog(**common)
@@ -1040,12 +1072,21 @@ class CrocGUI(Adw.Application):
 
 
 def main() -> None:
-    """Entry point for the croc-gui command."""
+    """Entry point for the gator command."""
     logging.basicConfig(
         level=logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
     )
-    CrocGUI().run(sys.argv)
+
+    # Extra-early suppression (before any application/window objects)
+    try:
+        gtk_settings = Gtk.Settings.get_default()
+        if gtk_settings:
+            gtk_settings.set_property("gtk-application-prefer-dark-theme", False)
+    except Exception:
+        pass
+
+    GatorApp().run(sys.argv)
 
 
 if __name__ == "__main__":

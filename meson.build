@@ -1,29 +1,29 @@
 project(
-  'croc-gui',
-  version: '1.2',
+  'gator',
+  version: '1.4',
   license: 'GPL-3.0-or-later',
-  meson_version: '>= 0.64.0',
+  meson_version: '>= 1.0.0',
 )
 
 gnome = import('gnome')
-python = import('python3').find_installation('python3', required: true)
+python = import('python').find_installation('python3', required: true)
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())
 
 # Python sources (installed as a package from src layout)
 install_subdir(
-  'src/croc_gui',
+  'src/gator',
   install_dir: python.get_install_dir(),
 )
 
-# Install a small launcher script so "croc-gui" works from PATH
+# Install a small launcher script so "gator" works from PATH
 conf = configuration_data()
 conf.set('PYTHON', python.full_path())
 conf.set('PKGDATADIR', pkgdatadir)
-conf.set('APPID', 'org.croc.CrocGUI')
+conf.set('APPID', 'org.gator.Gator')
 
 configure_file(
-  input: 'data/croc-gui.in',
-  output: 'croc-gui',
+  input: 'data/gator.in',
+  output: 'gator',
   configuration: conf,
   install: true,
   install_dir: get_option('bindir'),
@@ -32,22 +32,22 @@ configure_file(
 
 # Data files
 install_data(
-  'data/org.croc.CrocGUI.desktop',
+  'data/org.gator.Gator.desktop',
   install_dir: join_paths(get_option('datadir'), 'applications'),
 )
 
 install_data(
-  'data/org.croc.CrocGUI.metainfo.xml',
+  'data/org.gator.Gator.metainfo.xml',
   install_dir: join_paths(get_option('datadir'), 'metainfo'),
 )
 
 install_data(
-  'data/org.croc.CrocGUI.svg',
+  'data/org.gator.Gator.svg',
   install_dir: join_paths(get_option('datadir'), 'icons', 'hicolor', 'scalable', 'apps'),
 )
 
 install_data(
-  'data/org.croc.CrocGUI.gschema.xml',
+  'data/org.gator.Gator.gschema.xml',
   install_dir: join_paths(get_option('datadir'), 'glib-2.0', 'schemas'),
 )
 

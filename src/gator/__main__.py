@@ -1,4 +1,4 @@
-"""Allow running with python -m croc_gui (development)."""
+"""Allow running with python -m gator (development)."""
 
 from .app import main
 

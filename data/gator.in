@@ -4,11 +4,11 @@ import sys
 
 # Allow running the installed modules
 try:
-    from croc_gui import main
+    from gator import main
 except ImportError:
     # Fallback if layout differs
     sys.path.insert(0, '@PKGDATADIR@')
-    from croc_gui import main
+    from gator import main
 
 if __name__ == "__main__":
     main()

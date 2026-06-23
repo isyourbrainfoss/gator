@@ -1,4 +1,4 @@
-# Croc GUI – Agent Guide
+# Gator – Agent Guide
 
 ## Essential Commands
 
@@ -7,24 +7,27 @@
 pip install -e '.[qr,dev]'
 
 # Run application directly (development)
-python3 croc_gui.py
+PYTHONPATH=src python -m gator
+
+# After editable install:
+gator
 
 # Flatpak build test
-flatpak-builder --user --install --force-clean build-dir org.croc.CrocGUI.yml
-flatpak run org.croc.CrocGUI
+flatpak-builder --user --install --force-clean build-dir org.gator.Gator.yml
+flatpak run org.gator.Gator
 
 # Code quality (all must pass)
 black .
 ruff check .
-python3 -m mypy --ignore-missing-imports --no-error-summary src/croc_gui/ || echo "(mypi notes for gi + optional strictness are pre-existing)"
+python3 -m mypy --ignore-missing-imports --no-error-summary src/gator/ || echo "(mypi notes for gi + optional strictness are pre-existing)"
 
 # Installation testing
 pip install -e .
-croc-gui
+gator
 
 ## Architecture
 
-- **Single-file prototype**: `croc_gui.py` (~1200 lines) contains entire GTK application
+- **Modular source**: `src/gator/` contains the GTK application (split from the original single-file prototype)
 - **Extracted module**: `transfer.py` handles subprocess/threading for croc binary
 - **External dependency**: Requires `croc` binary in PATH for actual file transfers
 - **Optional QR support**: Install with `[qr]` extra for QR code generation/scanning
@@ -32,7 +35,7 @@ croc-gui
 ## Key Dependencies
 
 - **Python 3.10+** with PyGObject >= 3.42
-- **GTK 4** and **libadwaita 1.4+** (newer versions use `Adw.PreferencesDialog` vs fallback)
+- **GTK 4** and **libadwaita 1.7+** (newer versions use `Adw.PreferencesDialog` vs fallback; Flatpak targets GNOME 50)
 - **croc binary** must be available in PATH at runtime
 
 ## Development Workflow
@@ -43,7 +46,7 @@ croc-gui
 
 ## Critical Notes
 
-- **Libadwaita version compatibility**: Code includes fallbacks for older libadwaita versions (`Adw.AboutDialog` vs `Adw.AboutWindow`, `Adw.PreferencesDialog` availability)
+- **Libadwaita version compatibility**: Code includes fallbacks for older libadwaita versions (`Adw.AboutDialog` vs `Adw.AboutWindow`, `Adw.PreferencesDialog` availability); recommended runtime is GNOME 50 (libadwaita 1.7+)
 - **Thread-safe subprocess**: Never access `send_proc`/`receive_proc` without proper locking
 - **Settings format**: Currently JSON in config dir; planned migration to GSettings for Flatpak compatibility
 - **QR dependencies are optional**: Application degrades gracefully without PIL/pyzbar
@@ -53,10 +56,11 @@ croc-gui
 See `TASKS.md` for detailed roadmap. **64% complete** toward production readiness:
 - ✅ All P0 critical bugs fixed (thread safety, HIG compliance)  
 - ✅ Transfer logic extracted, type annotations added
-- 🔄 Next: Extract settings/pages modules, Meson build system, Flatpak packaging
+- ✅ Runtime updated to freshest GNOME 50
+- 🔄 Next: full GSettings migration, modern packaging refinements, Flatpak polish for Flathub
 
 ## Testing Strategy
 
 - **Unit tests**: Planned for `transfer.py` and future `settings.py` (no GTK dependencies)
-- **Manual testing**: Run with different libadwaita versions, test QR optional dependencies
+- **Manual testing**: Test on GNOME 50 (freshest) and older with fallbacks, test QR optional dependencies, verify Flatpak build with current runtime
 - **Integration**: Test croc binary integration with various file types and sizes

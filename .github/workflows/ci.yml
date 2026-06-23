@@ -30,7 +30,7 @@ jobs:
         run: ruff check .
 
       - name: Type check with mypy
-        run: python -m mypy --ignore-missing-imports --no-error-summary src/croc_gui/ || echo "mypy notes (GTK modules are expected)"
+        run: python -m mypy --ignore-missing-imports --no-error-summary src/gator/ || echo "mypy notes (GTK modules are expected)"
 
       - name: Test with pytest
         run: pytest tests/ -q --tb=short

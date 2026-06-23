@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<schemalist gettext-domain="croc-gui">
-  <schema id="org.croc.CrocGUI" path="/org/croc/CrocGUI/">
+<schemalist gettext-domain="gator">
+  <schema id="org.gator.Gator" path="/org/gator/Gator/">
     <!-- Appearance -->
     <key name="color-scheme" type="s">
       <default>'default'</default>
@@ -53,5 +53,13 @@
     <key name="port" type="i"><default>9009</default><range min="1" max="65535"/></key>
     <key name="transfers" type="i"><default>4</default><range min="1" max="100"/></key>
     <key name="qr" type="b"><default>false</default></key>
+    <key name="curve" type="s">
+      <default>'p256'</default>
+      <summary>Encryption curve</summary>
+    </key>
+    <key name="testing" type="b"><default>false</default></key>
+    <key name="quiet" type="b"><default>false</default></key>
+    <key name="disable-clipboard" type="b"><default>false</default></key>
+    <key name="extended-clipboard" type="b"><default>false</default></key>
   </schema>
 </schemalist>

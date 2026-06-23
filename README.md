@@ -1,4 +1,4 @@
-# Croc GUI
+# Gator
 
 A modern GTK4/Libadwaita frontend for [croc](https://github.com/schollz/croc) – secure file transfers made beautiful.
 
@@ -17,36 +17,36 @@ A modern GTK4/Libadwaita frontend for [croc](https://github.com/schollz/croc) �
 
 - **croc** binary (install from your distro or [releases page](https://github.com/schollz/croc/releases))
 - **Python 3.10+** with PyGObject
-- **GTK 4** and **libadwaita 1.4+**
+- **GTK 4** and **libadwaita 1.7+** (GNOME 50 runtime - freshest)
 
 ### From Source (development)
 
 ```bash
-git clone https://github.com/yourname/croc-gui.git
-cd croc-gui
+git clone https://github.com/isyourbrainfoss/gator.git
+cd gator
 pip install -e '.[qr,dev]'
 
-# Run directly:
-python3 croc_gui.py
+# Run directly (no install needed):
+PYTHONPATH=src python -m gator
 
-# Or after install:
-croc-gui
+# Or after install (recommended):
+gator
 ```
 
 ### Flatpak (for release / distribution)
 
-See `org.croc.CrocGUI.yml`.
+See `org.gator.Gator.yml`.
 
 Build locally:
 
 ```bash
-flatpak-builder --user --install --force-clean build-dir org.croc.CrocGUI.yml
-flatpak run org.croc.CrocGUI
+flatpak-builder --user --install --force-clean build-dir org.gator.Gator.yml
+flatpak run org.gator.Gator
 ```
 
 For a polished Flathub release you will also want:
 - Real screenshots in the metainfo
-- A high-quality app icon (replace `data/org.croc.CrocGUI.svg`)
+- A high-quality app icon (replace `data/org.gator.Gator.svg`)
 - Consider migrating settings to GSettings (stub schema already present)
 ```
 
@@ -54,12 +54,12 @@ For a polished Flathub release you will also want:
 
 ```bash
 pip install -e .[qr,dev]
-python3 croc_gui.py
+python3 -m gator  # or the installed gator command
 ```
 
 ## Project Status
 
-Currently a **single-file prototype** (`croc_gui.py`, ~1350 lines). See [`TASKS.md`](TASKS.md) for the roadmap to production readiness.
+The UI code has been split into modules under `src/gator/`. See [`TASKS.md`](TASKS.md) for the roadmap.
 
 **Completed:**
 - ✅ All critical bugs fixed (thread-safety, global args divergence, HIG violations)  

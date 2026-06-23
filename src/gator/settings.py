@@ -4,7 +4,7 @@ Currently uses a JSON file in the user config dir as the backing store.
 This is a non-Flatpak-friendly approach (direct FS writes).
 
 For Flatpak / GSettings migration (see TASKS.md):
-  - Add a GSettings XML schema (org.croc.CrocGUI.gschema.xml)
+  - Add a GSettings XML schema (org.gator.Gator.gschema.xml)
   - Install via Meson + glib-compile-schemas
   - Replace dict access with a Gio.Settings-backed object or adapter
   - Keep this module's JSON path as a fallback when GSettings is unavailable
@@ -27,9 +27,9 @@ from gi.repository import GLib
 logger = logging.getLogger(__name__)
 
 # ── Application constants (source of truth) ──────────────────────────────────
-APP_ID = "org.croc.CrocGUI"
-APP_NAME = "Croc GUI"
-APP_VERSION = "1.2"
+APP_ID = "org.gator.Gator"
+APP_NAME = "Gator"
+APP_VERSION = "1.4"
 
 CROC_BINARY = "croc"
 
@@ -43,7 +43,7 @@ DEFAULT_RELAY6 = "[2a01:4f9:c013:7b04::1]:9009"
 CODE_IS_PREFIX = "Code is: "
 
 # GSettings schema id (for future migration)
-GSETTINGS_SCHEMA_ID = "org.croc.CrocGUI"
+GSETTINGS_SCHEMA_ID = "org.gator.Gator"
 
 # ── Default settings values ──────────────────────────────────────────────────
 # Keys here are the canonical set. Values are the baked-in defaults.
@@ -79,6 +79,8 @@ DEFAULTS: dict[str, Any] = {
     "port": DEFAULT_PORT,
     "transfers": DEFAULT_TRANSFERS,
     "qr": False,
+    "show_qr_image": True,
+    "show_shell_output": False,
     # Advanced / hidden (rarely exposed in UI)
     "curve": "p256",
     "testing": False,
@@ -90,7 +92,7 @@ DEFAULTS: dict[str, Any] = {
 
 def get_config_dir() -> Path:
     """Return (and ensure) the directory used for the JSON fallback config."""
-    cfg = Path(GLib.get_user_config_dir()) / "croc-gui"
+    cfg = Path(GLib.get_user_config_dir()) / "gator"
     cfg.mkdir(parents=True, exist_ok=True)
     return cfg
 
@@ -168,11 +170,13 @@ PY_TO_GS = {
     "zip_folder": "zip-folder",
     "no_local": "no-local",
     "no_multi": "no-multi",
+    "disable_clipboard": "disable-clipboard",
+    "extended_clipboard": "extended-clipboard",
 }
 GS_TO_PY = {v: k for k, v in PY_TO_GS.items()}
 
 
-class CrocSettings(dict):
+class GatorSettings(dict):
     """Settings container that prefers GSettings (for Flatpak/GNOME) and
     falls back to JSON file. Acts mostly like a dict for compatibility.
     """
@@ -216,21 +220,13 @@ class CrocSettings(dict):
         if self._gsettings is not None:
             gkey = self._gs_key(key)
             try:
-                # Try types in likely order
-                try:
-                    return self._gsettings.get_boolean(gkey)
-                except Exception:
-                    pass
-                try:
-                    return self._gsettings.get_int(gkey)
-                except Exception:
-                    pass
-                val = self._gsettings.get_string(gkey)
+                # Check key exists in schema to avoid hard GIO errors
+                if gkey not in self._gsettings.list_keys():
+                    raise KeyError(gkey)
+                variant = self._gsettings.get_value(gkey)
+                val = variant.unpack()
                 if key == "save_dir" and not val:
                     return get_default_save_dir()
-                if val == "" and key in DEFAULTS:
-                    # fall back for empty string keys that have meaningful defaults
-                    return DEFAULTS[key]
                 return val
             except Exception as e:
                 logger.debug("GSettings read failed for %s: %s", key, e)
@@ -305,14 +301,14 @@ class CrocSettings(dict):
 
 # Backwards-compatible functions (used by some old call sites and wrappers)
 def load_settings() -> dict[str, Any]:
-    """Return a snapshot. Prefer the CrocSettings instance where possible."""
-    s = CrocSettings()
+    """Return a snapshot. Prefer the GatorSettings instance where possible."""
+    s = GatorSettings()
     return dict(s)
 
 
 def save_settings(settings: dict[str, Any]) -> None:
     """Best-effort save for dict snapshots."""
-    s = CrocSettings()
+    s = GatorSettings()
     for k, v in settings.items():
         s[k] = v
     s.save()
@@ -320,10 +316,4 @@ def save_settings(settings: dict[str, Any]) -> None:
 
 def get_settings() -> dict[str, Any]:
     """Return current settings (merged/validated)."""
-    return dict(CrocSettings())
-
-
-def reset_to_defaults() -> dict[str, Any]:
-    s = CrocSettings()
-    s.reset_to_defaults()
-    return dict(s)
+    return dict(GatorSettings())

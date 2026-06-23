@@ -1,0 +1,111 @@
+# Flatpak manifest for Gator
+# Build with: flatpak-builder --user --install --force-clean build-dir org.gator.Gator.yml
+# Requires (for GNOME 50 + golang extension):
+#   flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
+#   flatpak install --user flathub org.freedesktop.Sdk.Extension.golang//25.08
+#
+# Or use --install-deps-from=flathub with flatpak-builder (recommended)
+# (GNOME 50 is the freshest runtime as of 2026)
+#
+# Notes:
+# - Bundles its own croc binary so no host dependency.
+# - Uses GNOME 50 runtime (freshest as of 2026, matches latest libadwaita).
+# - Python modules installed via pip in the build.
+id: org.gator.Gator
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.golang  # for building croc (Go) - branch auto-selected to match the Freedesktop SDK of GNOME 50 (25.08)
+command: gator
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=xdg-download
+  - --filesystem=xdg-pictures  # for QR scan
+  - --talk-name=org.freedesktop.Notifications
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /man
+  - /share/doc
+  - /share/man
+  - '*.a'
+  - '*.la'
+
+modules:
+  # --- croc (Go) -------------------------------------------------------------
+  # Use archive + exact sha for reproducibility (required for Flathub)
+  - name: croc
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+      env:
+        GOPROXY: https://proxy.golang.org
+        # Network is required because the source tarball does not contain vendored modules.
+    build-commands:
+      - |
+        export PATH=/usr/lib/sdk/golang/bin:$PATH
+        go build -o $FLATPAK_DEST/bin/croc .
+    sources:
+      - type: archive
+        url: https://github.com/schollz/croc/archive/refs/tags/v10.4.4.tar.gz
+        sha256: 33e9160829705942178a017ce055196c4a66c9ef5cdfe8029e840be835e756d4
+        strip-components: 1
+
+  # --- zbar (for pyzbar QR scanning on receive) -----------------------------
+  # Build libzbar from source (minimal: no video, no GUI, no dbus) so pyzbar can decode.
+  # --with-dbusconfdir redirects any dbus files to a writable location.
+  - name: zbar
+    buildsystem: simple
+    build-commands:
+      - autoreconf -vfi
+      - ./configure --prefix=$FLATPAK_DEST --disable-video --disable-gtk --disable-qt --disable-doc --disable-python --without-dbus --with-dbusconfdir=$FLATPAK_DEST/share/dbus-1/system.d --without-x --without-imagemagick
+      - make -j $FLATPAK_BUILDER_N_JOBS
+      - make install
+      # Remove zbar's own python binding to avoid any conflict with the pip-installed pyzbar
+      - rm -f $FLATPAK_DEST/lib/python*/site-packages/zbar.* $FLATPAK_DEST/lib/python*/site-packages/zbar-*.egg-info || true
+    sources:
+      - type: archive
+        url: https://github.com/mchehab/zbar/archive/refs/tags/0.23.93.tar.gz
+        sha256: 212dfab527894b8bcbcc7cd1d43d63f5604a07473d31a5f02889e372614ebe28
+        strip-components: 1
+
+  # --- Optional Python QR deps (PyGObject + GTK from GNOME 50 runtime) ------
+  # Note: pillow and pyzbar may require additional -devel packages on the SDK
+  # for a full build. For Flathub this often pulls wheels or we can vendor.
+  - name: python-qr-deps
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - pip3 install --verbose --prefix=$FLATPAK_DEST --no-build-isolation "qrcode[pil]" pillow pyzbar
+      # Ensure pyzbar can find the libzbar we just built
+      - ln -sf /app/lib/libzbar.so.0 /app/lib/libzbar.so || true
+    sources: []
+
+  # --- Gator (the app) ------------------------------------------------------
+  # For local testing with flatpak-builder use type: dir
+  # For Flathub / release, switch to:
+  #   - type: git
+  #     url: https://github.com/isyourbrainfoss/gator.git
+  #     tag: ...
+  #     commit: ...
+  # Built against GNOME 50 runtime (freshest as of 2026)
+  - name: gator
+    buildsystem: meson
+    sources:
+      - type: dir
+        path: .
+    post-install:
+      # Ensure the entry point is executable
+      - chmod +x /app/bin/gator || true
+      - install -Dm644 data/org.gator.Gator.svg /app/share/icons/hicolor/scalable/apps/org.gator.Gator.svg || true
+
+  # Schemas etc are handled in the meson post-install step above

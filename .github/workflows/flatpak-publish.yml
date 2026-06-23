@@ -76,6 +76,9 @@ jobs:
         with:
           path: site
 
+      # Pages requires a public repo on the free GitHub plan. The bundle artifact
+      # above is the install path for private repositories.
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true

@@ -1,0 +1,9 @@
+[Flatpak Repo]
+Version=0
+Title=Gator
+Url=https://isyourbrainfoss.github.io/gator/
+Homepage=https://github.com/isyourbrainfoss/gator
+Comment=Community Flatpak builds of Gator
+Description=GTK4/Libadwaita frontend for croc secure file transfers
+Icon=https://raw.githubusercontent.com/isyourbrainfoss/gator/master/data/org.gator.Gator.svg
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo

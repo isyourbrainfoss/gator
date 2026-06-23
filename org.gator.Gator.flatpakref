@@ -1,0 +1,10 @@
+[Flatpak Ref]
+Title=Gator
+Name=org.gator.Gator
+Branch=master
+Url=https://isyourbrainfoss.github.io/gator/
+SuggestRemoteName=gator
+Homepage=https://github.com/isyourbrainfoss/gator
+Icon=https://raw.githubusercontent.com/isyourbrainfoss/gator/master/data/org.gator.Gator.svg
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
+IsRuntime=false

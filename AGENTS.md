@@ -16,8 +16,10 @@ gator
 flatpak-builder --user --install-deps-from=flathub --force-clean build-dir org.gator.Gator.devel.yml
 flatpak run org.gator.Gator
 
-# Release / Flathub manifest (fetches from GitHub)
+# Release manifest (fetches from GitHub)
 flatpak-builder --user --install-deps-from=flathub --force-clean build-dir org.gator.Gator.yml
+
+# CI publishes to GitHub Pages via .github/workflows/flatpak-publish.yml
 
 # Code quality (all must pass)
 black .

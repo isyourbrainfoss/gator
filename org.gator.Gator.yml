@@ -1,6 +1,7 @@
-# Flatpak manifest for Gator (release / Flathub)
+# Flatpak manifest for Gator (release)
 #
-# Fetches Gator source from GitHub — end users install a built Flatpak, not git.
+# Fetches Gator source from GitHub. End users install from the published Flatpak
+# repository (see README — GitHub Pages), not by cloning git.
 #
 # Build locally (same source Flathub will use):
 #   flatpak-builder --user --install-deps-from=flathub \

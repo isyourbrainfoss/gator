@@ -37,7 +37,46 @@ gator
 
 Gator bundles the `croc` binary inside the Flatpak — no separate croc install needed.
 
-**Local development build** (uses your working tree):
+#### Install from the GitHub-hosted repository (no git, no Flathub)
+
+GitHub Actions builds a Flatpak repository and publishes it to GitHub Pages.
+Users only need `flatpak` and the Flathub *runtime* (pulled automatically as a dependency).
+
+**One-time setup** (repo maintainer): enable **Settings → Pages → Source: GitHub Actions**.
+
+After the [Publish Flatpak](.github/workflows/flatpak-publish.yml) workflow has run successfully:
+
+```bash
+# Add the Gator remote (unsigned community repo — normal for self-hosted builds)
+flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
+  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
+
+# Install (also pulls org.gnome.Platform from Flathub as a runtime dependency)
+flatpak install --user gator org.gator.Gator
+flatpak run org.gator.Gator
+```
+
+Alternative one-liner using the `.flatpakref` file in this repo:
+
+```bash
+flatpak install --user --no-gpg-verify --from \
+  https://raw.githubusercontent.com/isyourbrainfoss/gator/master/org.gator.Gator.flatpakref
+```
+
+Updates later: `flatpak update --user org.gator.Gator`
+
+#### Publishing new builds
+
+Push to the default branch on GitHub (`main` or `master`). That triggers a rebuild and
+updates the Pages-hosted repository automatically. No git required on the user's machine.
+
+If your local rename work is on a feature branch, push it to GitHub's default branch, e.g.:
+
+```bash
+git push origin rename-to-gator:master
+```
+
+#### Local development build (uses your working tree)
 
 ```bash
 flatpak-builder --user --install-deps-from=flathub \
@@ -45,43 +84,10 @@ flatpak-builder --user --install-deps-from=flathub \
 flatpak run org.gator.Gator
 ```
 
-**Release build** (fetches source from GitHub, same as Flathub):
+#### Optional: Flathub
 
-```bash
-flatpak-builder --user --install-deps-from=flathub \
-  --force-clean build-dir org.gator.Gator.yml
-flatpak run org.gator.Gator
-```
-
-**Install from Flathub** (once published — no git required):
-
-```bash
-flatpak install flathub org.gator.Gator
-flatpak run org.gator.Gator
-```
-
-#### Flathub submission checklist
-
-1. Merge `rename-to-gator` into `main` and push to GitHub.
-2. Tag the release and update the pinned `tag` + `commit` in `org.gator.Gator.yml`:
-   ```bash
-   git tag v1.4
-   git push origin v1.4
-   ```
-3. Add real screenshots under `data/screenshots/` (1600×900 or 1200×675 PNG) — URLs in `data/org.gator.Gator.metainfo.xml` must resolve.
-4. Replace the placeholder icon (`data/org.gator.Gator.svg`) with a HIG-compliant design.
-5. Set a real `update_contact` email in the metainfo file.
-6. Build and lint locally:
-   ```bash
-   flatpak install -y flathub org.flatpak.Builder
-   flatpak run --command=flathub-build org.flatpak.Builder --install org.gator.Gator.yml
-   flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest org.gator.Gator.yml
-   ```
-7. Fork [flathub/flathub](https://github.com/flathub/flathub), branch from `new-pr`, add `org.gator.Gator.yml` (copy from this repo), open a PR titled **"Add org.gator.Gator"** against the `new-pr` base branch.
-8. Address review comments; comment `bot, build` on the PR to trigger a test build.
-9. After merge, Flathub hosts builds — users install with `flatpak install flathub org.gator.Gator`.
-
-See [Flathub submission docs](https://docs.flathub.org/docs/for-app-authors/submission).
+Flathub is independent and optional. If you submit there later, users would run
+`flatpak install flathub org.gator.Gator`. The self-hosted GitHub Pages repo works without it.
 
 ### Development
 

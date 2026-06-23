@@ -1,0 +1,67 @@
+# Build Gator as a Flatpak and publish an installable repository on GitHub Pages.
+# Users add the remote once — no git, no Flathub required.
+#
+# One-time repo setup (GitHub website):
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
+#
+# After the first successful run, install with:
+#   flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
+#     https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
+#   flatpak install --user gator org.gator.Gator
+
+name: Publish Flatpak
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: flatpak-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Flatpak repository
+        run: |
+          flatpak-builder \
+            --user \
+            --install-deps-from=flathub \
+            --disable-rofiles-fuse \
+            --force-clean \
+            --repo=repo \
+            build-dir \
+            org.gator.Gator.devel.yml
+          flatpak build-update-repo --generate-static-deltas repo/
+
+      - name: Prepare GitHub Pages site
+        run: |
+          mkdir -p site
+          cp -a repo/. site/
+          cp flatpak/gator.flatpakrepo site/gator.flatpakrepo
+          touch site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

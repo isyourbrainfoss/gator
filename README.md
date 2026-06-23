@@ -68,14 +68,28 @@ flatpak install --user --no-gpg-verify --from \
 
 Updates later: `flatpak update --user org.gator.Gator`
 
-**Private repository?** GitHub Pages is not available on the free plan for private repos.
-Download the `.flatpak` bundle from the latest [Actions workflow run](https://github.com/isyourbrainfoss/gator/actions) (Artifacts), then:
+#### ARM / postmarketOS (e.g. OnePlus 6)
+
+The GitHub Pages repository ships **x86_64 and aarch64** builds. Flatpak picks the
+matching architecture automatically — no separate remote or package name.
+
+On postmarketOS, install Flatpak and the GNOME runtime first (Phosh/sway/etc.):
 
 ```bash
-flatpak install --user ./org.gator.Gator.flatpak
+doas apk add flatpak flatpak-builder
+flatpak remote-add --user --if-not-exists flathub \
+  https://dl.flathub.org/repo/flathub.flatpakrepo
+
+flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
+  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
+flatpak install --user gator org.gator.Gator org.gnome.Platform//50
 ```
 
-Or make the repository public to use the Pages-hosted remote above.
+The GNOME 50 runtime is large (~hundreds of MB); a phone needs enough free storage.
+Gator’s UI is adaptive, but mobile use is still best-effort on small screens.
+
+Offline/alternative: download `org.gator.Gator.aarch64.flatpak` from the latest
+[Actions workflow run](https://github.com/isyourbrainfoss/gator/actions) (Artifacts).
 
 #### Publishing new builds
 

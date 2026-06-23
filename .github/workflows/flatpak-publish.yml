@@ -1,10 +1,8 @@
 # Build Gator as a Flatpak and publish an installable repository on GitHub Pages.
-# Users add the remote once — no git, no Flathub required.
+# Builds x86_64 and aarch64 into one ostree repo so ARM devices (e.g. OnePlus 6
+# on postmarketOS) install the correct architecture automatically.
 #
-# One-time repo setup (GitHub website):
-#   Settings → Pages → Build and deployment → Source: GitHub Actions
-#
-# After the first successful run, install with:
+# After the workflow runs, install with:
 #   flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
 #     https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
 #   flatpak install --user gator org.gator.Gator
@@ -27,8 +25,83 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-publish:
-    runs-on: ubuntu-latest
+  build-x86_64:
+    name: Build x86_64
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Flathub remote
+        run: |
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build Flatpak repository (x86_64)
+        run: |
+          flatpak-builder \
+            --arch=x86_64 \
+            --user \
+            --install-deps-from=flathub \
+            --disable-rofiles-fuse \
+            --force-clean \
+            --repo=repo \
+            build-dir \
+            org.gator.Gator.devel.yml
+
+      - name: Upload partial repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-repo-x86_64
+          path: repo/
+          retention-days: 7
+
+  build-aarch64:
+    name: Build aarch64
+    needs: build-x86_64
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download x86_64 repository
+        uses: actions/download-artifact@v4
+        with:
+          name: flatpak-repo-x86_64
+          path: repo
+
+      - name: Configure Flathub remote
+        run: |
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build Flatpak repository (aarch64)
+        run: |
+          flatpak-builder \
+            --arch=aarch64 \
+            --user \
+            --install-deps-from=flathub \
+            --disable-rofiles-fuse \
+            --force-clean \
+            --repo=repo \
+            build-dir \
+            org.gator.Gator.devel.yml
+
+      - name: Upload merged repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-repo
+          path: repo/
+          retention-days: 7
+
+  publish:
+    name: Publish repository
+    needs: build-aarch64
+    runs-on: ubuntu-24.04
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
       options: --privileged
@@ -38,30 +111,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download merged repository
+        uses: actions/download-artifact@v4
+        with:
+          name: flatpak-repo
+          path: repo
+
       - name: Configure Flathub remote
         run: |
           flatpak remote-add --user --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
 
-      - name: Build Flatpak repository
+      - name: Finalize repository and bundles
         run: |
-          flatpak-builder \
-            --user \
-            --install-deps-from=flathub \
-            --disable-rofiles-fuse \
-            --force-clean \
-            --repo=repo \
-            build-dir \
-            org.gator.Gator.devel.yml
           flatpak build-update-repo --generate-static-deltas repo/
           flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
-            repo org.gator.Gator.flatpak org.gator.Gator
+            repo org.gator.Gator.x86_64.flatpak org.gator.Gator
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            repo org.gator.Gator.aarch64.flatpak org.gator.Gator
 
-      - name: Upload Flatpak bundle artifact
+      - name: Upload Flatpak bundle artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: org.gator.Gator.flatpak
-          path: org.gator.Gator.flatpak
+          name: org.gator.Gator.flatpak-bundles
+          path: |
+            org.gator.Gator.x86_64.flatpak
+            org.gator.Gator.aarch64.flatpak
           retention-days: 90
 
       - name: Prepare GitHub Pages site
@@ -76,9 +151,6 @@ jobs:
         with:
           path: site
 
-      # Pages requires a public repo on the free GitHub plan. The bundle artifact
-      # above is the install path for private repositories.
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        continue-on-error: true

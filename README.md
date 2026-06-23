@@ -33,22 +33,55 @@ PYTHONPATH=src python -m gator
 gator
 ```
 
-### Flatpak (for release / distribution)
+### Flatpak (recommended for end users)
 
-See `org.gator.Gator.yml`.
+Gator bundles the `croc` binary inside the Flatpak — no separate croc install needed.
 
-Build locally:
+**Local development build** (uses your working tree):
 
 ```bash
-flatpak-builder --user --install --force-clean build-dir org.gator.Gator.yml
+flatpak-builder --user --install-deps-from=flathub \
+  --force-clean build-dir org.gator.Gator.devel.yml
 flatpak run org.gator.Gator
 ```
 
-For a polished Flathub release you will also want:
-- Real screenshots in the metainfo
-- A high-quality app icon (replace `data/org.gator.Gator.svg`)
-- Consider migrating settings to GSettings (stub schema already present)
+**Release build** (fetches source from GitHub, same as Flathub):
+
+```bash
+flatpak-builder --user --install-deps-from=flathub \
+  --force-clean build-dir org.gator.Gator.yml
+flatpak run org.gator.Gator
 ```
+
+**Install from Flathub** (once published — no git required):
+
+```bash
+flatpak install flathub org.gator.Gator
+flatpak run org.gator.Gator
+```
+
+#### Flathub submission checklist
+
+1. Merge `rename-to-gator` into `main` and push to GitHub.
+2. Tag the release and update the pinned `tag` + `commit` in `org.gator.Gator.yml`:
+   ```bash
+   git tag v1.4
+   git push origin v1.4
+   ```
+3. Add real screenshots under `data/screenshots/` (1600×900 or 1200×675 PNG) — URLs in `data/org.gator.Gator.metainfo.xml` must resolve.
+4. Replace the placeholder icon (`data/org.gator.Gator.svg`) with a HIG-compliant design.
+5. Set a real `update_contact` email in the metainfo file.
+6. Build and lint locally:
+   ```bash
+   flatpak install -y flathub org.flatpak.Builder
+   flatpak run --command=flathub-build org.flatpak.Builder --install org.gator.Gator.yml
+   flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest org.gator.Gator.yml
+   ```
+7. Fork [flathub/flathub](https://github.com/flathub/flathub), branch from `new-pr`, add `org.gator.Gator.yml` (copy from this repo), open a PR titled **"Add org.gator.Gator"** against the `new-pr` base branch.
+8. Address review comments; comment `bot, build` on the PR to trigger a test build.
+9. After merge, Flathub hosts builds — users install with `flatpak install flathub org.gator.Gator`.
+
+See [Flathub submission docs](https://docs.flathub.org/docs/for-app-authors/submission).
 
 ### Development
 

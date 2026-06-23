@@ -12,9 +12,12 @@ PYTHONPATH=src python -m gator
 # After editable install:
 gator
 
-# Flatpak build test
-flatpak-builder --user --install --force-clean build-dir org.gator.Gator.yml
+# Flatpak build test (local tree)
+flatpak-builder --user --install-deps-from=flathub --force-clean build-dir org.gator.Gator.devel.yml
 flatpak run org.gator.Gator
+
+# Release / Flathub manifest (fetches from GitHub)
+flatpak-builder --user --install-deps-from=flathub --force-clean build-dir org.gator.Gator.yml
 
 # Code quality (all must pass)
 black .

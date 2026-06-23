@@ -1,11 +1,16 @@
-# Flatpak manifest for Gator
-# Build with: flatpak-builder --user --install --force-clean build-dir org.gator.Gator.yml
-# Requires (for GNOME 50 + golang extension):
-#   flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
-#   flatpak install --user flathub org.freedesktop.Sdk.Extension.golang//25.08
+# Flatpak manifest for Gator (release / Flathub)
 #
-# Or use --install-deps-from=flathub with flatpak-builder (recommended)
-# (GNOME 50 is the freshest runtime as of 2026)
+# Fetches Gator source from GitHub — end users install a built Flatpak, not git.
+#
+# Build locally (same source Flathub will use):
+#   flatpak-builder --user --install-deps-from=flathub \
+#     --force-clean build-dir org.gator.Gator.yml
+#   flatpak run org.gator.Gator
+#
+# Uncommitted local changes: use org.gator.Gator.devel.yml (type: dir) instead.
+#
+# Before tagging a release, update the gator module's tag + commit below.
+# Requires GNOME 50 runtime + golang SDK extension (installed via --install-deps-from).
 #
 # Notes:
 # - Bundles its own croc binary so no host dependency.
@@ -91,18 +96,15 @@ modules:
     sources: []
 
   # --- Gator (the app) ------------------------------------------------------
-  # For local testing with flatpak-builder use type: dir
-  # For Flathub / release, switch to:
-  #   - type: git
-  #     url: https://github.com/isyourbrainfoss/gator.git
-  #     tag: ...
-  #     commit: ...
-  # Built against GNOME 50 runtime (freshest as of 2026)
+  # Pinned git source (required for Flathub reproducibility).
+  # Update tag + commit when cutting a release; tag must exist on GitHub.
   - name: gator
     buildsystem: meson
     sources:
-      - type: dir
-        path: .
+      - type: git
+        url: https://github.com/isyourbrainfoss/gator.git
+        tag: v1.4
+        commit: e78dd31e2734c9453fde6d0d7503378e2fe5c34b
     post-install:
       # Ensure the entry point is executable
       - chmod +x /app/bin/gator || true

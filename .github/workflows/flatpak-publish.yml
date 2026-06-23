@@ -38,6 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure Flathub remote
+        run: |
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
       - name: Build Flatpak repository
         run: |
           flatpak-builder \
@@ -49,6 +54,15 @@ jobs:
             build-dir \
             org.gator.Gator.devel.yml
           flatpak build-update-repo --generate-static-deltas repo/
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            repo org.gator.Gator.flatpak org.gator.Gator
+
+      - name: Upload Flatpak bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: org.gator.Gator.flatpak
+          path: org.gator.Gator.flatpak
+          retention-days: 90
 
       - name: Prepare GitHub Pages site
         run: |

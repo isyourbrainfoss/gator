@@ -42,9 +42,12 @@ Gator bundles the `croc` binary inside the Flatpak — no separate croc install 
 GitHub Actions builds a Flatpak repository and publishes it to GitHub Pages.
 Users only need `flatpak` and the Flathub *runtime* (pulled automatically as a dependency).
 
-**One-time setup** (repo maintainer): enable **Settings → Pages → Source: GitHub Actions**.
+**One-time setup** (repo maintainer):
 
-After the [Publish Flatpak](.github/workflows/flatpak-publish.yml) workflow has run successfully:
+1. Enable **Settings → Pages → Source: GitHub Actions** (requires a **public** repository on the free GitHub plan).
+2. Wait for the [Publish Flatpak](.github/workflows/flatpak-publish.yml) workflow to finish after a push to `master`.
+
+After Pages is live:
 
 ```bash
 # Add the Gator remote (unsigned community repo — normal for self-hosted builds)
@@ -64,6 +67,15 @@ flatpak install --user --no-gpg-verify --from \
 ```
 
 Updates later: `flatpak update --user org.gator.Gator`
+
+**Private repository?** GitHub Pages is not available on the free plan for private repos.
+Download the `.flatpak` bundle from the latest [Actions workflow run](https://github.com/isyourbrainfoss/gator/actions) (Artifacts), then:
+
+```bash
+flatpak install --user ./org.gator.Gator.flatpak
+```
+
+Or make the repository public to use the Pages-hosted remote above.
 
 #### Publishing new builds
 

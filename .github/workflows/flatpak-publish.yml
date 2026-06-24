@@ -3,8 +3,8 @@
 # on postmarketOS) install the correct architecture automatically.
 #
 # After the workflow runs, install with:
-#   flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
-#     https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
+#   flatpak remote-add --user --if-not-exists --no-gpg-verify --from gator \
+#     https://isyourbrainfoss.github.io/gator/gator.flatpakrepo
 #   flatpak install --user gator org.gator.Gator
 
 name: Publish Flatpak

@@ -51,18 +51,18 @@ After Pages is live:
 
 ```bash
 # Add the Gator remote (unsigned community repo — normal for self-hosted builds)
-flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
-  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
+flatpak remote-add --user --if-not-exists --no-gpg-verify --from gator \
+  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo
 
 # Install (also pulls org.gnome.Platform from Flathub as a runtime dependency)
 flatpak install --user gator org.gator.Gator
 flatpak run org.gator.Gator
 ```
 
-Alternative one-liner using the `.flatpakref` file in this repo:
+Alternative one-liner using the `.flatpakref` file in this repo (adds the remote automatically):
 
 ```bash
-flatpak install --user --no-gpg-verify --from \
+flatpak install --user --from \
   https://raw.githubusercontent.com/isyourbrainfoss/gator/master/org.gator.Gator.flatpakref
 ```
 
@@ -80,8 +80,8 @@ doas apk add flatpak flatpak-builder
 flatpak remote-add --user --if-not-exists flathub \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 
-flatpak remote-add --user --if-not-exists --no-gpg-verify --from \
-  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo gator
+flatpak remote-add --user --if-not-exists --no-gpg-verify --from gator \
+  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo
 flatpak install --user gator org.gator.Gator org.gnome.Platform//50
 ```
 

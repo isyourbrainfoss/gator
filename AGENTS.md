@@ -53,16 +53,15 @@ gator
 
 - **Libadwaita version compatibility**: Code includes fallbacks for older libadwaita versions (`Adw.AboutDialog` vs `Adw.AboutWindow`, `Adw.PreferencesDialog` availability); recommended runtime is GNOME 50 (libadwaita 1.7+)
 - **Thread-safe subprocess**: Never access `send_proc`/`receive_proc` without proper locking
-- **Settings format**: Currently JSON in config dir; planned migration to GSettings for Flatpak compatibility
+- **Settings format**: GSettings in Flatpak (`org.gator.Gator.gschema.xml`); JSON fallback in `~/.config/gator/` for dev/pip runs
 - **QR dependencies are optional**: Application degrades gracefully without PIL/pyzbar
 
 ## Current Status
 
-See `TASKS.md` for detailed roadmap. **64% complete** toward production readiness:
-- ✅ All P0 critical bugs fixed (thread safety, HIG compliance)  
-- ✅ Transfer logic extracted, type annotations added
-- ✅ Runtime updated to freshest GNOME 50
-- 🔄 Next: full GSettings migration, modern packaging refinements, Flatpak polish for Flathub
+See `TASKS.md` for detailed roadmap. **~96% complete** toward production readiness:
+- ✅ All P0/P1 bugs fixed; Gio.Subprocess transfers with progress bars
+- ✅ GSettings + Flatpak packaging (bundled croc); GitHub Pages install repo
+- 🔄 Optional: Flathub submission, transfer history, real screenshots in metainfo
 
 ## Testing Strategy
 

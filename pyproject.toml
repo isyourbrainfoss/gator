@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gator"
-version = "1.4"
+version = "1.5"
 description = "Modern GTK4/Libadwaita frontend for croc secure file transfers"
 readme = "README.md"
 license = "GPL-3.0-or-later"

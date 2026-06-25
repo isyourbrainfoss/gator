@@ -1,129 +1,76 @@
 # Gator – Refactoring & Production Readiness Tasks
 
-This document tracks the refactoring work needed to make Gator production-ready
-(renamed from the former "Croc GUI" project)
-for Flathub submission. The original single-file app had several critical bugs and
-HIG violations that have been systematically addressed.
+Tracks work toward a stable Flatpak release. Most items are done; see **Remaining** at the bottom.
 
-## Session Summary
+## Status
 
-**Session 1:** Fixed all P0 critical bugs (6 items)  
-**Session 2:** Completed most P1-P3 items (9 additional items)  
-**Session 3:** Completed final P1 item (1 additional item)  
-**Session 4:** Completed remaining P2/P3 + modules + tests + meson/flatpak (6+ items)
+**25/26 items completed (96%)**
 
-**Total progress:** 23/25 items completed (92%)  
-**Remaining:** 2 stretch items (cancelled as out-of-scope for this pass)
+| Priority | Done |
+|----------|------|
+| P0 Critical | 6/6 |
+| P1 High | 3/3 |
+| P2 Medium | 6/6 |
+| P3 Low | 8/8 |
+| P4 Stretch | 2/3 |
 
-## Critical Fixes (P0) — completed in session 1
+## Critical Fixes (P0) — done
 
-- [x] **Unified `_build_global_args()`** – replaced the two divergent implementations
-  (`get_global_args()` for receive vs. inline block for send). Receive was silently
-  ignoring all user settings except relay and password. Now both paths share one
-  method.
-- [x] **Thread-safe subprocess handles** – renamed `send_proc`/`receive_proc` to
-  private attributes, protected reads/writes with `threading.Lock`, closed stdout
-  pipes in `finally` blocks, cleared proc references after `wait()`.
-- [x] **`Adw.HeaderBar` on modal windows** – `on_add_text` and `show_received_text`
-  now use `Adw.ToolbarView` + `Adw.HeaderBar`, giving them a CSD close button on
-  Wayland.
-- [x] **`Adw.AboutDialog` with fallback** – replaced deprecated `Adw.AboutWindow`
-  with `Adw.AboutDialog` (libadwaita ≥ 1.5); falls back to `Adw.AboutWindow` on
-  older runtimes.
-- [x] **Removed `Adw.init()`** – unnecessary with `Adw.Application`; deprecated in
-  libadwaita 1.7+ (GNOME 50 - freshest).
-- [x] **Replaced silent `except: pass` with logging** – `load_settings`,
-  `save_settings`, QR generation, clipboard paste, QR scan, and the folder-open
-  handler all now log warnings/errors and surface failures to the user via toasts
-  where appropriate. `logging.basicConfig` wired at entry point.
+- [x] Unified `build_global_args()` for send and receive
+- [x] Thread-safe subprocess handles (legacy; superseded by Gio.Subprocess)
+- [x] `Adw.HeaderBar` on modal windows
+- [x] `Adw.AboutDialog` with fallback
+- [x] Removed `Adw.init()`
+- [x] Replaced silent `except: pass` with logging
 
----
+## High Priority (P1) — done
 
-## High Priority (P1) — completed
+- [x] `Adw.PreferencesDialog` for settings
+- [x] Receive-side `--yes` / `--overwrite` preference rows
+- [x] Extract `transfer.py` (`CrocSendTransfer` / `CrocReceiveTransfer`)
 
-- [x] **Replace `Gtk.Window` preferences with `Adw.PreferencesDialog`** –
-  replaced the manual `Gtk.Window` + `Adw.HeaderBar` with proper `Adw.PreferencesDialog`
-  (falling back to the old approach on libadwaita < 1.5). Added helper methods
-  `_make_switch_row()` and `_make_entry_row()` to reduce code duplication.
-- [x] **Add receive-side `--yes`/`--overwrite` preference rows** – previously 
-  hardcoded as `--yes --overwrite`, now exposed as "Automatically accept incoming 
-  transfers" and "Overwrite existing files without prompt" toggles in the Receiving 
-  section.
+## Medium Priority (P2) — done
 
-## High Priority (P1) — completed
+- [x] Constants block in `settings.py`
+- [x] Fix `destructive-action` misuse on Exclude button
+- [x] Type annotations and docstrings
+- [x] Extract `settings.py` with validation and GSettings + JSON fallback
+- [x] Extract `send_page.py` and `receive_page.py`
+- [x] Improve received-text detection
 
-- [x] **Extract `transfer.py`** – created `CrocTransfer` base class with
-  `CrocSendTransfer` and `CrocReceiveTransfer` subclasses. All subprocess/thread
-  logic moved out of the main Application class. Callbacks use `GLib.idle_add`
-  for main-loop dispatch. Settings-only dependency enables unit testing without
-  GTK. Reduced `app.py` by ~150 lines.
+## Low Priority (P3) — done
 
----
+- [x] `.desktop` file
+- [x] AppStream metainfo
+- [x] SVG app icon
+- [x] `pyproject.toml` packaging
+- [x] Meson build system
+- [x] Flatpak manifest (bundles croc v10.4.4)
+- [x] Unit tests (`test_settings`, `test_transfer`, `test_qr`, `test_theme`)
+- [x] QR module (`qr.py`)
 
-## Medium Priority (P2) — completed
+## Stretch (P4)
 
-- [x] **Add constants block** – extracted `APP_ID`, `CROC_BINARY`, `DEFAULT_PORT`,
-  `DEFAULT_TRANSFERS`, `DEFAULT_MULTICAST`, `DEFAULT_RELAY`, `DEFAULT_RELAY6`,
-  `CODE_IS_PREFIX`, `APP_NAME`, and `APP_VERSION` constants. Threaded references
-  throughout the codebase, eliminating 15+ magic strings.
-- [x] **Fix `destructive-action` misuse on Exclude button** – changed from
-  `destructive-action` to `flat` since exclusions are reversible.
-- [x] **Add type annotations and docstrings** – added complete type hints and
-  docstrings to all public methods. Imported `from __future__ import annotations`
-  and `typing.Any` for forward compatibility.
+- [x] **Gio.Subprocess** – `transfer.py` uses async `Gio.Subprocess` + chunk reads (no worker threads)
+- [x] **Progress reporting** – parse croc `\r`/`\n` output; drive send/receive progress bars
+- [x] **Drag-and-drop to receive** – QR scan from dropped image
+- [ ] **Transfer history** – optional log of past codes/files (not planned for v1.x)
 
-## Medium Priority (P2) — completed
+## Post-roadmap fixes (v1.5)
 
-- [x] **Extract `settings.py`** – centralise config load/save with validation.
-  JSON remains the runtime store; GSettings schema stub + meson support added
-  as preparation for Flatpak migration.
-- [x] **Extract `send_page.py` and `receive_page.py`** – UI construction moved
-  into widget subclasses (SendPage / ReceivePage). Controller state and handlers
-  remain in Gator for compatibility.
-- [x] **Improve received-text detection** – replaced brittle "Receiving (<-"
-  prefix + progress filter with:
-  - directory snapshot before/after to decide file vs text
-  - relaxed content-line collector (no reliance on exact marker string)
-  - always fall back to croc-stdin-* temp file
-  - added _is_likely_content_line helper.
+- [x] Empty croc defaults (relay, port, hash, etc.) — let croc use its own built-ins
+- [x] Legacy relay migration for older saved settings
+- [x] Send UI: full-width progress bar, sent-file checkmarks, completion feedback
+- [x] GitHub Pages Flatpak repo (x86_64 + aarch64) on every `master` push
 
----
+## Remaining / optional
 
-## Low Priority (P3) — completed
+- [ ] Transfer history (P4 — defer)
+- [ ] Replace placeholder screenshots in metainfo before Flathub submission
+- [ ] Flathub submission (optional; GitHub Pages install works without it)
 
-- [x] **`.desktop` file** (`data/org.gator.Gator.desktop`) – application launcher
-  with proper categories, keywords, MIME type, and GNOME integration.
-- [x] **AppStream metainfo** (`data/org.gator.Gator.metainfo.xml`) – complete
-  metainfo with description, screenshots, release notes, content rating, and
-  all required Flathub fields.
-- [x] **SVG app icon stub** (`data/org.gator.Gator.svg`) – placeholder icon with
-  transfer arrows. Should be replaced with a proper HIG-compliant design.
-- [x] **Python packaging** (`pyproject.toml`) – complete packaging metadata with
-  optional dependencies, development tools, and entry points.
+## Distribution notes
 
-## Low Priority (P3) — completed
-
-- [x] **Meson build system** – `meson.build` + data launcher template. Installs
-  desktop file, metainfo, scalable icon, gschema, Python sources.
-- [x] **Flatpak manifest** (`org.gator.Gator.yml`) – bundles croc (Go build
-  module) + GUI. Uses GNOME 50 runtime.
-- [x] **Unit tests** – Added `tests/test_settings.py`, `test_transfer.py`,
-  `test_qr.py`. Pure logic only (no GTK). Run with `pytest`.
-- [x] **QR module** – extracted inline QR bits to `qr.py` (optional deps).
-
----
-
-## Stretch / Future (P4) — pending
-
-- [ ] **Replace `subprocess.Popen` + threads with `Gio.Subprocess`** – integrates
-  with the GLib main loop natively, removing the need for manual threads and
-  `GLib.idle_add` for stdout reading.
-- [ ] **Progress reporting** – parse croc's progress output and drive a
-  `Gtk.ProgressBar` instead of a spinner.
-- [ ] **Resume / history** – store a transfer log with timestamps, file names, and
-  codes in `~/.local/share/gator/` (or `~/.config/gator/`).
-- [x] **Drag-and-drop to receive** – accept a dropped image file on the receive
-  page (via ReceivePage) and run QR scan (bonus P4 item completed).
-- [ ] (remaining P4) Replace subprocess with Gio.Subprocess, progress bars, history.
-
-(Three P2 + three P3 + 1 P4 bonus completed. 2 stretch items remain.)
+- **End users:** install via Flatpak from GitHub Pages (`org.gator.Gator.flatpakref`). No separate croc install; CI builds from `org.gator.Gator.devel.yml` on each push to `master`.
+- **Version tags:** optional GitHub Releases (`v1.5`, …) for changelog visibility. Flatpak updates do **not** require a GitHub Release — only a successful Publish Flatpak workflow on `master`.
+- **Pinned manifest:** `org.gator.Gator.yml` pins a git tag/commit for reproducible release builds (Flathub-style); keep in sync when tagging.

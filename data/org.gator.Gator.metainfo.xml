@@ -53,11 +53,22 @@
   <url type="translate">https://github.com/isyourbrainfoss/gator/wiki/Translation</url>
   
   <developer_name>Gator Contributors</developer_name>
-  <update_contact>your-email@example.com</update_contact>
+  <update_contact>https://github.com/isyourbrainfoss/gator/issues</update_contact>
   
   <content_rating type="oars-1.1" />
   
   <releases>
+    <release version="1.5" date="2026-06-25">
+      <description>
+        <p>Transfer reliability and UI polish:</p>
+        <ul>
+          <li>Progress bars for send/receive (croc carriage-return output)</li>
+          <li>Empty croc defaults so Gator matches plain croc relays and flags</li>
+          <li>Sent-file checkmarks and clearer transfer-finished feedback</li>
+          <li>GSettings schema fixes; bundled croc in Flatpak</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4" date="2026-06-21">
       <description>
         <p>Updated to the freshest GNOME 50 runtime and corresponding SDK extension (25.08) for latest libadwaita and platform features.</p>

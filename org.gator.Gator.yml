@@ -97,15 +97,14 @@ modules:
     sources: []
 
   # --- Gator (the app) ------------------------------------------------------
-  # Pinned git source (required for Flathub reproducibility).
-  # Update tag + commit when cutting a release; tag must exist on GitHub.
+  # Pinned git source for reproducible release builds (Flathub-style).
+  # Update tag when cutting a release. CI uses org.gator.Gator.devel.yml instead.
   - name: gator
     buildsystem: meson
     sources:
       - type: git
         url: https://github.com/isyourbrainfoss/gator.git
         tag: v1.5
-        commit: a3cf447c1d1b6c9a98bec375cd5762b4561ff62b
     post-install:
       # Ensure the entry point is executable
       - chmod +x /app/bin/gator || true

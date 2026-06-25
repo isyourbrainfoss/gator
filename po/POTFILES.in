@@ -1,0 +1,8 @@
+src/gator/app.py
+src/gator/dialogs.py
+src/gator/preferences.py
+src/gator/receive_page.py
+src/gator/send_page.py
+src/gator/window.py
+data/org.gator.Gator.desktop
+data/org.gator.Gator.metainfo.xml

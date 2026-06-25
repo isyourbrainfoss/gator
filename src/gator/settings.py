@@ -172,6 +172,8 @@ PY_TO_GS = {
     "no_multi": "no-multi",
     "disable_clipboard": "disable-clipboard",
     "extended_clipboard": "extended-clipboard",
+    "show_qr_image": "show-qr-image",
+    "show_shell_output": "show-shell-output",
 }
 GS_TO_PY = {v: k for k, v in PY_TO_GS.items()}
 

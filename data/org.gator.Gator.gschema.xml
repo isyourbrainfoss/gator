@@ -53,6 +53,14 @@
     <key name="port" type="i"><default>9009</default><range min="1" max="65535"/></key>
     <key name="transfers" type="i"><default>4</default><range min="1" max="100"/></key>
     <key name="qr" type="b"><default>false</default></key>
+    <key name="show-qr-image" type="b">
+      <default>true</default>
+      <summary>Show QR code image in the send UI</summary>
+    </key>
+    <key name="show-shell-output" type="b">
+      <default>false</default>
+      <summary>Show croc shell output log panels</summary>
+    </key>
     <key name="curve" type="s">
       <default>'p256'</default>
       <summary>Encryption curve</summary>

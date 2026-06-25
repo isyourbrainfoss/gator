@@ -1,38 +1,50 @@
-"""send_page.py – Send tab extracted into a widget subclass.
-
-_build_send_page logic has been moved here.  To keep the controller code
-in GatorApp unchanged we assign created widgets back onto app (e.g.
-app.files_listbox, app.send_log, ...).  The page owns the tree.
-"""
+"""send_page.py – Send tab widget with GObject signals."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk, Pango
+from gi.repository import Adw, Gdk, GObject, Gtk, Pango
+
+from .a11y import set_a11y_label
+from .i18n import _
+from .theme import get_theme_rgba, rgba_to_hex
 
 if TYPE_CHECKING:
-    from .app import GatorApp
+    from gi.repository import Gdk
+
+    from .settings import GatorSettings
 
 
-class SendPage(Gtk.ScrolledWindow):
-    """Encapsulates the entire "Send" page UI.
+class SendPage(Gtk.Box):
+    """Send page: file list, transfer controls, optional QR and log."""
 
-    After construction, the owning GatorApp instance has many of its
-    ``self.xxx`` widget references populated so existing handler methods
-    continue to work.
-    """
+    __gsignals__ = {
+        "add-files": (GObject.SignalFlags.RUN_LAST, None, (bool,)),
+        "add-folder": (GObject.SignalFlags.RUN_LAST, None, (bool,)),
+        "add-text": (GObject.SignalFlags.RUN_LAST, None, ()),
+        "clear-all": (GObject.SignalFlags.RUN_LAST, None, ()),
+        "start-send": (GObject.SignalFlags.RUN_LAST, None, ()),
+        "cancel-send": (GObject.SignalFlags.RUN_LAST, None, ()),
+        "copy-code": (GObject.SignalFlags.RUN_LAST, None, ()),
+        "files-dropped": (GObject.SignalFlags.RUN_LAST, bool, (object,)),
+        "remove-item": (GObject.SignalFlags.RUN_LAST, None, (str, bool)),
+        "remove-text": (GObject.SignalFlags.RUN_LAST, None, ()),
+    }
 
-    def __init__(self, app: GatorApp) -> None:
-        super().__init__()
-        # Use AUTOMATIC horizontally so the page can shrink below its natural width
-        # on narrow windows (prevents AdwToastOverlay "exceeds" warnings).
-        self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        self.app = app
+    def __init__(self, settings: GatorSettings) -> None:
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+        self.settings = settings
+        self.selected_files: list[str] = []
+        self.excluded_items: list[str] = []
+        self.send_text: str = ""
+        self._error_tag_applied = False
         self._build_content()
 
     def _build_content(self) -> None:
@@ -43,29 +55,24 @@ class SendPage(Gtk.ScrolledWindow):
             margin_end=6,
             margin_top=6,
             margin_bottom=6,
+            vexpand=True,
         )
         clamp = Adw.Clamp(maximum_size=900, tightening_threshold=720)
-        form = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=6,
-            margin_start=6,
-            margin_end=6,
-            margin_top=6,
-            margin_bottom=6,
-        )
+        form = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
-        # Buttons box
-        buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         form.append(buttons_box)
+        buttons_row = Gtk.Box(spacing=6, homogeneous=True)
+        buttons_box.append(buttons_row)
 
-        # Add button
-        self.app.add_btn = Gtk.MenuButton()
-        self.app.add_btn.add_css_class("suggested-action")
-        self.app.add_btn.add_css_class("pill")
+        self.add_btn = Gtk.MenuButton()
+        self.add_btn.add_css_class("suggested-action")
+        self.add_btn.add_css_class("pill")
+        set_a11y_label(self.add_btn, _("Add"))
         add_h = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         add_h.append(Gtk.Image.new_from_icon_name("list-add-symbolic"))
-        add_h.append(Gtk.Label(label="Add"))
-        self.app.add_btn.set_child(add_h)
+        add_h.append(Gtk.Label(label=_("Add")))
+        self.add_btn.set_child(add_h)
         add_pop = Gtk.Popover()
         add_vbox = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
@@ -75,48 +82,43 @@ class SendPage(Gtk.ScrolledWindow):
             margin_top=12,
             margin_bottom=12,
         )
-        files_btn = Gtk.Button()
-        files_box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
-        files_box.append(Gtk.Image.new_from_icon_name("folder-documents-symbolic"))
-        files_box.append(Gtk.Label(label="Add Files"))
-        files_btn.set_child(files_box)
-        files_btn.connect(
-            "clicked",
-            lambda *_: (self.app.on_add_files(included=True), add_pop.popdown()),
-        )
-        add_vbox.append(files_btn)
-        folder_btn = Gtk.Button()
-        folder_box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
-        folder_box.append(Gtk.Image.new_from_icon_name("folder-symbolic"))
-        folder_box.append(Gtk.Label(label="Add Folder"))
-        folder_btn.set_child(folder_box)
-        folder_btn.connect(
-            "clicked",
-            lambda *_: (self.app.on_add_folder(included=True), add_pop.popdown()),
-        )
-        add_vbox.append(folder_btn)
-        text_btn = Gtk.Button()
-        text_box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
-        text_box.append(
-            Gtk.Image.new_from_icon_name("accessories-text-editor-symbolic")
-        )
-        text_box.append(Gtk.Label(label="Add Text"))
-        text_btn.set_child(text_box)
-        text_btn.connect(
-            "clicked", lambda *_: (self.app.on_add_text(), add_pop.popdown())
-        )
-        add_vbox.append(text_btn)
+        for label, icon, signal in [
+            (_("Add Files"), "folder-documents-symbolic", "add-files"),
+            (_("Add Folder"), "folder-symbolic", "add-folder"),
+            (_("Add Text"), "accessories-text-editor-symbolic", "add-text"),
+        ]:
+            btn = Gtk.Button()
+            box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
+            box.append(Gtk.Image.new_from_icon_name(icon))
+            box.append(Gtk.Label(label=label))
+            btn.set_child(box)
+            if signal == "add-text":
+                btn.connect(
+                    "clicked", lambda *_: (self.emit("add-text"), add_pop.popdown())
+                )
+            elif signal == "add-files":
+                btn.connect(
+                    "clicked",
+                    lambda *_: (self.emit("add-files", True), add_pop.popdown()),
+                )
+            else:
+                btn.connect(
+                    "clicked",
+                    lambda *_: (self.emit("add-folder", True), add_pop.popdown()),
+                )
+            add_vbox.append(btn)
         add_pop.set_child(add_vbox)
-        self.app.add_btn.set_popover(add_pop)
-        buttons_box.append(self.app.add_btn)
+        self.add_btn.set_popover(add_pop)
+        self.add_btn.set_hexpand(True)
+        buttons_row.append(self.add_btn)
 
-        # Exclude button – "flat" not "destructive-action"
-        self.app.exclude_btn = Gtk.MenuButton()
-        self.app.exclude_btn.add_css_class("flat")
+        self.exclude_btn = Gtk.MenuButton()
+        self.exclude_btn.add_css_class("flat")
+        set_a11y_label(self.exclude_btn, _("Exclude"))
         exclude_h = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         exclude_h.append(Gtk.Image.new_from_icon_name("list-remove-symbolic"))
-        exclude_h.append(Gtk.Label(label="Exclude"))
-        self.app.exclude_btn.set_child(exclude_h)
+        exclude_h.append(Gtk.Label(label=_("Exclude")))
+        self.exclude_btn.set_child(exclude_h)
         exclude_pop = Gtk.Popover()
         exclude_vbox = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
@@ -126,131 +128,143 @@ class SendPage(Gtk.ScrolledWindow):
             margin_top=12,
             margin_bottom=12,
         )
-        ex_files_btn = Gtk.Button()
-        ex_files_box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
-        ex_files_box.append(Gtk.Image.new_from_icon_name("folder-documents-symbolic"))
-        ex_files_box.append(Gtk.Label(label="Exclude Files"))
-        ex_files_btn.set_child(ex_files_box)
-        ex_files_btn.connect(
-            "clicked",
-            lambda *_: (self.app.on_add_files(included=False), exclude_pop.popdown()),
-        )
-        exclude_vbox.append(ex_files_btn)
-        ex_folder_btn = Gtk.Button()
-        ex_folder_box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
-        ex_folder_box.append(Gtk.Image.new_from_icon_name("folder-symbolic"))
-        ex_folder_box.append(Gtk.Label(label="Exclude Folder"))
-        ex_folder_btn.set_child(ex_folder_box)
-        ex_folder_btn.connect(
-            "clicked",
-            lambda *_: (self.app.on_add_folder(included=False), exclude_pop.popdown()),
-        )
-        exclude_vbox.append(ex_folder_btn)
+        for label, icon, sig in [
+            (_("Exclude Files"), "folder-documents-symbolic", "add-files"),
+            (_("Exclude Folder"), "folder-symbolic", "add-folder"),
+        ]:
+            btn = Gtk.Button()
+            box = Gtk.Box(spacing=10, orientation=Gtk.Orientation.HORIZONTAL)
+            box.append(Gtk.Image.new_from_icon_name(icon))
+            box.append(Gtk.Label(label=label))
+            btn.set_child(box)
+            if sig == "add-files":
+                btn.connect(
+                    "clicked",
+                    lambda *_: (self.emit("add-files", False), exclude_pop.popdown()),
+                )
+            else:
+                btn.connect(
+                    "clicked",
+                    lambda *_: (self.emit("add-folder", False), exclude_pop.popdown()),
+                )
+            exclude_vbox.append(btn)
         exclude_pop.set_child(exclude_vbox)
-        self.app.exclude_btn.set_popover(exclude_pop)
-        buttons_box.append(self.app.exclude_btn)
+        self.exclude_btn.set_popover(exclude_pop)
+        self.exclude_btn.set_hexpand(True)
+        buttons_row.append(self.exclude_btn)
 
-        # Clear all button
-        self.app.clear_btn = Gtk.Button()
-        self.app.clear_btn.add_css_class("destructive-action")
+        self.clear_btn = Gtk.Button()
+        self.clear_btn.add_css_class("destructive-action")
         clear_h = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         clear_h.append(Gtk.Image.new_from_icon_name("edit-clear-symbolic"))
-        clear_h.append(Gtk.Label(label="Clear All"))
-        self.app.clear_btn.set_child(clear_h)
-        self.app.clear_btn.connect("clicked", self.app.on_clear_all)
-        buttons_box.append(self.app.clear_btn)
+        clear_h.append(Gtk.Label(label=_("Clear All")))
+        self.clear_btn.set_child(clear_h)
+        self.clear_btn.connect("clicked", lambda *_: self.emit("clear-all"))
+        self.clear_btn.set_hexpand(True)
+        buttons_box.append(self.clear_btn)
 
-        # File list
         file_scroll = Gtk.ScrolledWindow()
         file_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         file_scroll.set_propagate_natural_height(True)
         file_scroll.set_vexpand(True)
-        self.app.files_listbox = Gtk.ListBox()
-        self.app.files_listbox.add_css_class("boxed-list")
-        self.app.files_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.files_listbox = Gtk.ListBox()
+        self.files_listbox.add_css_class("boxed-list")
+        self.files_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
         placeholder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         placeholder.append(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
-        placeholder.append(Gtk.Label(label="No files or folders selected"))
-        placeholder.get_last_child().add_css_class("dim-label")
+        ph_label = Gtk.Label(label=_("No files or folders selected"))
+        ph_label.add_css_class("dim-label")
+        placeholder.append(ph_label)
         placeholder.set_valign(Gtk.Align.CENTER)
         placeholder.set_margin_top(20)
-        self.app.files_listbox.set_placeholder(placeholder)
-        file_scroll.set_child(self.app.files_listbox)
+        self.files_listbox.set_placeholder(placeholder)
+        file_scroll.set_child(self.files_listbox)
         form.append(file_scroll)
 
-        # Drop target for drag and drop (delegates to app)
         drop_target = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY)
-        drop_target.connect("drop", self.app.on_drop_file)
-        self.app.files_listbox.add_controller(drop_target)
+        drop_target.connect("drop", self._on_drop)
+        self.files_listbox.add_controller(drop_target)
 
-        # Controls
         controls = Gtk.CenterBox()
-        self.app.send_start_btn = Gtk.Button()
-        self.app.send_start_btn.add_css_class("suggested-action")
-        self.app.send_start_btn.add_css_class("pill")
+        self.send_start_btn = Gtk.Button()
+        self.send_start_btn.add_css_class("suggested-action")
+        self.send_start_btn.add_css_class("pill")
         send_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         send_btn_box.append(Gtk.Image.new_from_icon_name("document-send-symbolic"))
-        send_btn_box.append(Gtk.Label(label="Start Transfer"))
-        self.app.send_start_btn.set_child(send_btn_box)
-        self.app.send_start_btn.set_sensitive(False)
-        self.app.send_start_btn.connect("clicked", self.app.on_start_send)
-        controls.set_center_widget(self.app.send_start_btn)
-        self.app.send_transfer_box = Gtk.Box(spacing=12)
-        self.app.send_spinner = Gtk.Spinner()
-        self.app.send_spinner.set_size_request(32, 32)
-        self.app.send_transfer_label = Gtk.Label(label="Preparing")
-        cancel_btn = Gtk.Button(label="Cancel")
+        send_btn_box.append(Gtk.Label(label=_("Start Transfer")))
+        self.send_start_btn.set_child(send_btn_box)
+        self.send_start_btn.set_sensitive(False)
+        self.send_start_btn.connect("clicked", lambda *_: self.emit("start-send"))
+        controls.set_center_widget(self.send_start_btn)
+
+        self.send_transfer_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=6
+        )
+        transfer_row = Gtk.Box(spacing=12)
+        self.send_spinner = Gtk.Spinner()
+        self.send_spinner.set_size_request(32, 32)
+        self.send_transfer_label = Gtk.Label(
+            label=_("Preparing"), ellipsize=Pango.EllipsizeMode.END, hexpand=True
+        )
+        cancel_btn = Gtk.Button(label=_("Cancel"))
         cancel_btn.add_css_class("destructive-action")
-        cancel_btn.connect("clicked", self.app.on_cancel_send)
-        self.app.send_transfer_box.append(self.app.send_spinner)
-        self.app.send_transfer_box.append(self.app.send_transfer_label)
-        self.app.send_transfer_box.append(cancel_btn)
-        self.app.send_transfer_box.set_visible(False)
-        controls.set_end_widget(self.app.send_transfer_box)
+        cancel_btn.connect("clicked", lambda *_: self.emit("cancel-send"))
+        transfer_row.append(self.send_spinner)
+        transfer_row.append(self.send_transfer_label)
+        transfer_row.append(cancel_btn)
+        self.send_transfer_box.append(transfer_row)
+        self.send_progress = Gtk.ProgressBar(show_text=True)
+        self.send_progress.set_visible(False)
+        self.send_transfer_box.append(self.send_progress)
+        self.send_transfer_box.set_visible(False)
+        controls.set_end_widget(self.send_transfer_box)
         form.append(controls)
 
-        # Transfer info container
-        self.app.transfer_info = Gtk.Box(
+        self.transfer_info = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
             spacing=6,
             halign=Gtk.Align.CENTER,
             margin_top=6,
         )
-        self.app.transfer_info.set_visible(False)
+        self.transfer_info.set_visible(False)
 
-        self.app.code_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        self.app.code_label = Gtk.Label(
+        self.code_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.code_label = Gtk.Label(
             xalign=0,
             selectable=True,
             wrap=True,
             wrap_mode=Pango.WrapMode.WORD_CHAR,
             css_classes=["heading", "monospace"],
+            hexpand=True,
         )
-        self.app.code_box.append(self.app.code_label)
+        self.code_box.append(self.code_label)
         copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
-        copy_btn.set_tooltip_text("Copy code")
-        copy_btn.connect("clicked", self.app.on_copy_code)
-        self.app.code_box.append(copy_btn)
+        copy_btn.set_tooltip_text(_("Copy code"))
+        set_a11y_label(copy_btn, _("Copy code"))
+        copy_btn.connect("clicked", lambda *_: self.emit("copy-code"))
+        self.code_box.append(copy_btn)
 
         qr_clamp = Adw.Clamp(maximum_size=320, tightening_threshold=256)
-        self.app.qr_picture = Gtk.Picture(content_fit=Gtk.ContentFit.SCALE_DOWN)
-        self.app.qr_picture.set_size_request(256, 256)
-        self.app.qr_picture.add_css_class("card")
-        self.app.qr_picture.set_visible(self.app.settings.get("show_qr_image", True))
-        qr_clamp.set_child(self.app.qr_picture)
+        self.qr_picture = Gtk.Picture(content_fit=Gtk.ContentFit.SCALE_DOWN)
+        self.qr_picture.set_size_request(256, 256)
+        self.qr_picture.add_css_class("card")
+        self.qr_picture.set_visible(self.settings.get("show_qr_image", True))
+        qr_clamp.set_child(self.qr_picture)
 
-        self.app.transfer_info.append(self.app.code_box)
-        self.app.transfer_info.append(qr_clamp)
-        form.append(self.app.transfer_info)
+        self.transfer_info.append(self.code_box)
+        self.transfer_info.append(qr_clamp)
+        form.append(self.transfer_info)
 
         clamp.set_child(form)
         outer.append(clamp)
 
-        # Log
+        self.log_expander = Gtk.Expander(label=_("Shell output"), margin_top=6)
+        self.log_expander.set_visible(self.settings.get("show_shell_output", False))
+        self.log_expander.set_expanded(True)
         log_scroll = Gtk.ScrolledWindow(vexpand=True)
         log_scroll.add_css_class("background")
-        log_scroll.set_min_content_height(400)
-        self.app.send_log = Gtk.TextView(
+        log_scroll.set_min_content_height(200)
+        self.send_log = Gtk.TextView(
             editable=False,
             wrap_mode=Gtk.WrapMode.WORD,
             monospace=True,
@@ -259,10 +273,129 @@ class SendPage(Gtk.ScrolledWindow):
             left_margin=12,
             right_margin=12,
         )
-        self.app.send_log.get_buffer().create_tag("error", foreground="#ff5555")
-        log_scroll.set_child(self.app.send_log)
-        log_scroll.set_visible(self.app.settings.get("show_shell_output", False))
-        outer.append(log_scroll)
-        self.app.send_log_scroll = log_scroll
+        log_scroll.set_child(self.send_log)
+        self.log_expander.set_child(log_scroll)
+        outer.append(self.log_expander)
 
-        self.set_child(outer)
+        scroll = Gtk.ScrolledWindow(vexpand=True, hexpand=True)
+        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_propagate_natural_width(False)
+        scroll.set_child(outer)
+        self.append(scroll)
+
+    def _on_drop(
+        self, drop_target: Gtk.DropTarget, value: Any, _x: float, _y: float
+    ) -> bool:
+        if isinstance(value, Gdk.FileList):
+            self.emit("files-dropped", value)
+            return True
+        return False
+
+    def _ensure_error_tag(self) -> None:
+        if self._error_tag_applied:
+            return
+        error_rgba = get_theme_rgba(self, "error_color")
+        self.send_log.get_buffer().create_tag(
+            "error", foreground=rgba_to_hex(error_rgba)
+        )
+        self._error_tag_applied = True
+
+    def append_log(self, text: str, *, is_error: bool = False) -> None:
+        self._ensure_error_tag()
+        buf = self.send_log.get_buffer()
+        end = buf.get_end_iter()
+        if is_error or text.lower().startswith("error"):
+            buf.insert_with_tags(end, text + "\n", "error")
+        else:
+            buf.insert(end, text + "\n")
+        mark = buf.create_mark("end", buf.get_end_iter(), False)
+        self.send_log.scroll_mark_onscreen(mark)
+
+    def set_shell_output_visible(self, visible: bool) -> None:
+        self.log_expander.set_visible(visible)
+
+    def set_qr_visible(self, visible: bool) -> None:
+        self.qr_picture.set_visible(visible)
+
+    def set_transfer_active(self, active: bool, label: str = "") -> None:
+        self.send_start_btn.set_visible(not active)
+        self.send_transfer_box.set_visible(active)
+        if active:
+            self.send_spinner.start()
+            if label:
+                self.send_transfer_label.set_label(label)
+            self.send_progress.set_fraction(0.0)
+            self.send_progress.set_visible(True)
+        else:
+            self.send_spinner.stop()
+            self.send_progress.set_visible(False)
+
+    def set_progress(self, fraction: float) -> None:
+        self.send_progress.set_fraction(fraction)
+        self.send_progress.set_text(f"{int(fraction * 100)}%")
+
+    def show_code(self, code: str) -> None:
+        self.code_label.set_label(code)
+        self.transfer_info.set_visible(True)
+
+    def hide_code(self) -> None:
+        self.transfer_info.set_visible(False)
+        self.code_label.set_label("")
+        self.qr_picture.set_paintable(None)
+
+    def set_qr_paintable(self, paintable: Gdk.Paintable | None) -> None:
+        self.qr_picture.set_paintable(paintable)
+
+    def get_code(self) -> str:
+        return self.code_label.get_label()
+
+    def refresh_file_list(
+        self,
+        selected: list[str],
+        excluded: list[str],
+        send_text: str,
+    ) -> None:
+        """Rebuild list rows."""
+        import os
+        from pathlib import Path
+
+        self.selected_files = selected
+        self.excluded_items = excluded
+        self.send_text = send_text
+        while row := self.files_listbox.get_row_at_index(0):
+            self.files_listbox.remove(row)
+
+        for path in selected:
+            name = Path(path).name + (_(" (folder)") if os.path.isdir(path) else "")
+            row = Adw.ActionRow(title=name, subtitle=path)
+            row.add_prefix(Gtk.Image.new_from_icon_name("list-add-symbolic"))
+            rm = Gtk.Button(icon_name="edit-delete-symbolic")
+            rm.add_css_class("flat")
+            set_a11y_label(rm, _("Remove"))
+            rm.connect("clicked", lambda _, p=path: self.emit("remove-item", p, True))
+            row.add_suffix(rm)
+            self.files_listbox.append(row)
+        for path in excluded:
+            name = Path(path).name + (_(" (folder)") if os.path.isdir(path) else "")
+            row = Adw.ActionRow(title=name, subtitle=path)
+            row.add_prefix(Gtk.Image.new_from_icon_name("list-remove-symbolic"))
+            rm = Gtk.Button(icon_name="edit-delete-symbolic")
+            rm.add_css_class("flat")
+            set_a11y_label(rm, _("Remove"))
+            rm.connect("clicked", lambda _, p=path: self.emit("remove-item", p, False))
+            row.add_suffix(rm)
+            self.files_listbox.append(row)
+        if send_text:
+            collapsed = " ".join(send_text.splitlines())
+            subtitle = collapsed[:50] + ("..." if len(collapsed) > 50 else "")
+            row = Adw.ActionRow(title=_("Text"), subtitle=subtitle)
+            row.add_prefix(
+                Gtk.Image.new_from_icon_name("accessories-text-editor-symbolic")
+            )
+            rm = Gtk.Button(icon_name="edit-delete-symbolic")
+            rm.add_css_class("flat")
+            set_a11y_label(rm, _("Remove"))
+            rm.connect("clicked", lambda _: self.emit("remove-text"))
+            row.add_suffix(rm)
+            self.files_listbox.append(row)
+        self.send_start_btn.set_sensitive(bool(selected) or bool(send_text))

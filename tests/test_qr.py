@@ -20,7 +20,7 @@ def test_flags_are_bools():
 def test_generate_graceful_without_deps(monkeypatch):
     # Even if deps present, we can force off for test of path
     monkeypatch.setattr("gator.qr.HAS_QR_GEN", False)
-    assert generate_qr_texture("hello", False) is None
+    assert generate_qr_texture("hello", "#000000", "#ffffff") is None
 
 
 def test_scan_graceful(tmp_path):

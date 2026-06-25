@@ -6,6 +6,7 @@ project(
 )
 
 gnome = import('gnome')
+i18n = import('i18n')
 python = import('python').find_installation('python3', required: true)
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())
 
@@ -49,6 +50,11 @@ install_data(
 install_data(
   'data/org.gator.Gator.gschema.xml',
   install_dir: join_paths(get_option('datadir'), 'glib-2.0', 'schemas'),
+)
+
+i18n.gettext(
+  'gator',
+  preset: 'glib',
 )
 
 # Compile schemas / update caches on install (best effort)

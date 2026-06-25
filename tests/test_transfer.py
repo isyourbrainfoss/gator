@@ -4,7 +4,17 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from gator.transfer import CrocReceiveTransfer, CrocSendTransfer, build_global_args
+from gator.transfer import (
+    CrocReceiveTransfer,
+    CrocSendTransfer,
+    build_global_args,
+    parse_progress_fraction,
+)
+
+
+def test_parse_progress_fraction():
+    assert parse_progress_fraction("Sending  45%") == 0.45
+    assert parse_progress_fraction("no progress here") is None
 
 
 def test_build_global_args_basic():

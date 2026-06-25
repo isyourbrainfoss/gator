@@ -37,7 +37,14 @@ class ReceivePage(Gtk.Box):
         self.settings = settings
         self._save_dir = save_dir
         self._error_tag_applied = False
+        self._receive_success = False
         self._build_content()
+
+    def _make_success_icon(self, *, size: int = 16) -> Gtk.Image:
+        icon = Gtk.Image.new_from_icon_name("emblem-ok")
+        icon.set_pixel_size(size)
+        icon.set_valign(Gtk.Align.CENTER)
+        return icon
 
     def _build_content(self) -> None:
         outer = Gtk.Box(
@@ -107,21 +114,27 @@ class ReceivePage(Gtk.Box):
         self.receive_transfer_box.set_hexpand(True)
         transfer_row = Gtk.Box(spacing=12)
         transfer_row.set_hexpand(True)
+        self.receive_status_stack = Gtk.Stack()
+        self.receive_status_stack.set_size_request(32, 32)
         self.receive_spinner = Gtk.Spinner()
-        self.receive_spinner.set_size_request(32, 32)
         self.receive_spinner.set_valign(Gtk.Align.CENTER)
+        self.receive_success_icon = self._make_success_icon(size=24)
+        self.receive_status_stack.add_named(self.receive_spinner, "spinner")
+        self.receive_status_stack.add_named(self.receive_success_icon, "success")
         self.receive_transfer_label = Gtk.Label(
             label=_("Waiting for sender"),
             ellipsize=Pango.EllipsizeMode.END,
             hexpand=True,
             halign=Gtk.Align.START,
         )
-        cancel_btn = Gtk.Button(label=_("Cancel"))
-        cancel_btn.add_css_class("destructive-action")
-        cancel_btn.connect("clicked", lambda *_: self.emit("cancel-receive"))
-        transfer_row.append(self.receive_spinner)
+        self.receive_cancel_btn = Gtk.Button(label=_("Cancel"))
+        self.receive_cancel_btn.add_css_class("destructive-action")
+        self.receive_cancel_btn.connect(
+            "clicked", lambda *_: self.emit("cancel-receive")
+        )
+        transfer_row.append(self.receive_status_stack)
         transfer_row.append(self.receive_transfer_label)
-        transfer_row.append(cancel_btn)
+        transfer_row.append(self.receive_cancel_btn)
         self.receive_transfer_box.append(transfer_row)
         self.receive_progress = Gtk.ProgressBar(show_text=True)
         self.receive_progress.set_hexpand(True)
@@ -200,12 +213,50 @@ class ReceivePage(Gtk.Box):
         self.code_entry.set_sensitive(not active)
         self.receive_btn_box.set_sensitive(not active)
         if active:
+            self._receive_success = False
+            self._update_folder_row_success()
+            self.receive_status_stack.set_visible_child_name("spinner")
             self.receive_spinner.start()
+            self.receive_cancel_btn.set_visible(True)
+            self.receive_transfer_label.set_label(_("Waiting for sender"))
             self.receive_progress.set_fraction(0.0)
             self.receive_progress.set_visible(True)
         else:
             self.receive_spinner.stop()
             self.receive_progress.set_visible(False)
+
+    def set_transfer_phase(self, phase: str) -> None:
+        labels = {
+            "hashing": _("Hashing"),
+            "sending": _("Receiving"),
+            "receiving": _("Receiving"),
+        }
+        if phase in labels:
+            self.receive_transfer_label.set_label(labels[phase])
+
+    def show_transfer_complete(self, *, canceled: bool) -> None:
+        self.receive_spinner.stop()
+        self.receive_cancel_btn.set_visible(False)
+        if canceled:
+            self.receive_status_stack.set_visible_child_name("spinner")
+            self.receive_transfer_label.set_label(_("Transfer cancelled"))
+            self.receive_progress.set_visible(False)
+        else:
+            self._receive_success = True
+            self._update_folder_row_success()
+            self.receive_status_stack.set_visible_child_name("success")
+            self.receive_transfer_label.set_label(_("Transfer finished"))
+            self.receive_progress.set_fraction(1.0)
+            self.receive_progress.set_text(_("Done"))
+            self.receive_progress.set_visible(True)
+
+    def _update_folder_row_success(self) -> None:
+        if self._receive_success:
+            self.folder_row.set_subtitle(_("Received successfully"))
+            self.folder_row.add_css_class("success")
+        else:
+            self.folder_row.set_subtitle(self._save_dir)
+            self.folder_row.remove_css_class("success")
 
     def set_progress(self, fraction: float) -> None:
         self.receive_progress.set_fraction(fraction)

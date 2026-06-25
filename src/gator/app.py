@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -282,6 +283,7 @@ class GatorApp(Adw.Application):
             on_code=self._show_code_and_qr,
             on_finished=self._on_send_finished,
             on_progress=self.send_page.set_progress,
+            on_status=self.send_page.set_transfer_phase,
         )
         self._send_transfer.start()
 
@@ -342,15 +344,26 @@ class GatorApp(Adw.Application):
             on_transfer_complete=self._show_transfer_complete_popup,
             on_finished=self._on_receive_finished,
             on_progress=self.receive_page.set_progress,
+            on_status=self.receive_page.set_transfer_phase,
         )
         self._receive_transfer.start()
 
     def _on_receive_finished(self) -> None:
         canceled = self._receive_transfer.canceled if self._receive_transfer else False
-        self.receive_page.set_transfer_active(False)
         msg = _("Transfer cancelled.") if canceled else _("Transfer finished.")
         self.receive_page.append_log(msg)
         self._receive_transfer = None
+        if canceled:
+            self.receive_page.show_transfer_complete(canceled=True)
+            GLib.timeout_add(1500, self._reset_receive_controls)
+        else:
+            self.receive_page.show_transfer_complete(canceled=False)
+            self.add_toast(_("Transfer finished"))
+            GLib.timeout_add(2500, self._reset_receive_controls)
+
+    def _reset_receive_controls(self) -> bool:
+        self.receive_page.set_transfer_active(False)
+        return False
 
     def _on_cancel_receive(self, _page) -> None:
         if self._receive_transfer is not None:
@@ -476,8 +489,11 @@ class GatorApp(Adw.Application):
 
 
 def main() -> None:
+    log_level = logging.WARNING
+    if os.environ.get("GATOR_LOG", "").lower() in ("1", "true", "debug", "yes"):
+        log_level = logging.DEBUG
     logging.basicConfig(
-        level=logging.WARNING,
+        level=log_level,
         format="%(levelname)s %(name)s: %(message)s",
     )
     GatorApp().run(sys.argv)

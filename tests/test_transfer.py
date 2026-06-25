@@ -8,6 +8,8 @@ from gator.transfer import (
     CrocReceiveTransfer,
     CrocSendTransfer,
     build_global_args,
+    build_receive_args,
+    detect_transfer_phase,
     normalize_croc_code,
     parse_progress_fraction,
     split_croc_output,
@@ -176,27 +178,24 @@ def test_normalize_croc_code():
     assert normalize_croc_code("1234 lion stop sofia") == "1234-lion-stop-sofia"
 
 
-def test_receive_build_args_uses_positional_code():
-    t = CrocReceiveTransfer(
-        settings={"relay": "", "relay6": ""},
-        code="1234-test-code",
-        save_dir="/tmp",
-        on_log=lambda _m: None,
-        on_text_received=lambda _t: None,
-        on_transfer_complete=lambda: None,
-        on_finished=lambda: None,
-    )
-    t._code = "Code is: 1234 test code"
-    t._before = set()
-    # Build what _launch would assemble without spawning
-    code = normalize_croc_code(t._code)
-    args = ["croc"] + build_global_args(t._settings)
-    if "--yes" not in args:
-        args += ["--yes"]
-    args.append(code)
+def test_detect_transfer_phase():
+    assert detect_transfer_phase("Hashing download.zip  45%") == "hashing"
+    assert detect_transfer_phase("download.zip  20% |██") == "sending"
+    assert detect_transfer_phase("Receiving file (foo)  50%") == "receiving"
+    assert detect_transfer_phase("Code is: abc") is None
+
+
+def test_receive_build_args_respects_yes_pref():
+    args = build_receive_args({"yes": False, "relay": ""}, "1234-test-code")
     assert args[-1] == "1234-test-code"
-    assert "--relay6" not in args
+    assert "--relay" not in args
+    assert "--yes" not in args
+
+
+def test_receive_build_args_with_yes():
+    args = build_receive_args({"yes": True}, "abc-code")
     assert "--yes" in args
+    assert args[-1] == "abc-code"
 
 
 def test_receive_transfer_construction():

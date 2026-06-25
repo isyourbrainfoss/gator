@@ -31,6 +31,7 @@ finish-args:
   - --socket=wayland
   - --device=dri
   - --filesystem=xdg-download
+  - --filesystem=xdg-documents
   - --filesystem=xdg-pictures  # for QR scan
   - --talk-name=org.freedesktop.Notifications
 

@@ -66,7 +66,7 @@ DEFAULTS: dict[str, Any] = {
     "color_scheme": "default",
     # Receiving
     "save_dir": None,  # resolved at runtime to XDG_DOWNLOAD or $HOME
-    "yes": False,
+    "yes": True,  # GUI has no terminal prompt; disable in prefs to review each transfer
     "overwrite": False,
     # General
     "debug": False,

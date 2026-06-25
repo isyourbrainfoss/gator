@@ -18,7 +18,7 @@
       <summary>Default folder for received files</summary>
     </key>
     <key name="yes" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Automatically accept incoming transfers (--yes)</summary>
     </key>
     <key name="overwrite" type="b">

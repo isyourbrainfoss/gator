@@ -388,11 +388,18 @@ class SendPage(Gtk.Box):
             self.send_text,
         )
 
+    def set_transfer_phase(self, phase: str) -> None:
+        labels = {
+            "hashing": _("Hashing"),
+            "sending": _("Sending"),
+            "receiving": _("Sending"),
+        }
+        if phase in labels:
+            self.send_transfer_label.set_label(labels[phase])
+
     def set_progress(self, fraction: float) -> None:
         self.send_progress.set_fraction(fraction)
         self.send_progress.set_text(f"{int(fraction * 100)}%")
-        if fraction > 0:
-            self.send_transfer_label.set_label(_("Sending"))
 
     def show_code(self, code: str) -> None:
         self.code_label.set_label(code)

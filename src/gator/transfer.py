@@ -29,6 +29,23 @@ def normalize_croc_code(code: str) -> str:
     return normalized.replace(" ", "-")
 
 
+def detect_transfer_phase(line: str) -> str | None:
+    """Return ``hashing``, ``sending``, ``receiving``, or None from a croc line."""
+    low = line.lower()
+    if "hashing" in low and "%" in line:
+        return "hashing"
+    if parse_progress_fraction(line) is not None:
+        if "receiving" in low:
+            return "receiving"
+        return "sending"
+    return None
+
+
+def build_receive_args(settings: dict[str, Any], code: str) -> list[str]:
+    """Build argv for a croc receive invocation."""
+    return [CROC_BINARY] + build_global_args(settings) + [normalize_croc_code(code)]
+
+
 def parse_progress_fraction(line: str) -> float | None:
     """Return 0.0–1.0 if *line* looks like a croc progress update."""
     match = _PROGRESS_RE.search(line)
@@ -131,6 +148,7 @@ class CrocTransfer:
         on_log: Callable[[str], None],
         on_finished: Callable[[], None],
         on_progress: Callable[[float], None] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> None:
         self._proc: Gio.Subprocess | None = None
         self._stream: Gio.DataInputStream | None = None
@@ -142,6 +160,7 @@ class CrocTransfer:
         self._on_log = on_log
         self._on_finished = on_finished
         self._on_progress = on_progress
+        self._on_status = on_status
 
     def start(self) -> None:
         """Launch croc asynchronously on the GLib main loop."""
@@ -257,6 +276,10 @@ class CrocTransfer:
         self._handle_line(stripped)
 
     def _handle_line(self, line: str) -> None:
+        if self._on_status is not None:
+            phase = detect_transfer_phase(line)
+            if phase is not None:
+                self._on_status(phase)
         if self._on_progress is not None:
             fraction = parse_progress_fraction(line)
             if fraction is not None:
@@ -302,9 +325,13 @@ class CrocSendTransfer(CrocTransfer):
         on_code: Callable[[str], None],
         on_finished: Callable[[], None],
         on_progress: Callable[[float], None] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(
-            on_log=on_log, on_finished=on_finished, on_progress=on_progress
+            on_log=on_log,
+            on_finished=on_finished,
+            on_progress=on_progress,
+            on_status=on_status,
         )
         self._settings = settings
         self._files = list(files)
@@ -373,9 +400,13 @@ class CrocReceiveTransfer(CrocTransfer):
         on_transfer_complete: Callable[[], None],
         on_finished: Callable[[], None],
         on_progress: Callable[[float], None] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(
-            on_log=on_log, on_finished=on_finished, on_progress=on_progress
+            on_log=on_log,
+            on_finished=on_finished,
+            on_progress=on_progress,
+            on_status=on_status,
         )
         self._settings = settings
         self._code = code
@@ -419,10 +450,7 @@ class CrocReceiveTransfer(CrocTransfer):
             self._before = set()
         code = normalize_croc_code(self._code)
         self._code = code
-        args = [CROC_BINARY] + build_global_args(self._settings)
-        if "--yes" not in args:
-            args += ["--yes"]
-        args.append(code)
+        args = build_receive_args(self._settings, code)
         display = [f'"{a}"' if " " in a else a for a in args]
         self._on_log(f"Running: {' '.join(display)}")
         self._on_log(f'Receiving with code "{code}"')

@@ -22,6 +22,7 @@ finish-args:
   - --socket=wayland
   - --device=dri
   - --filesystem=xdg-download
+  - --filesystem=xdg-documents
   - --filesystem=xdg-pictures
   - --talk-name=org.freedesktop.Notifications
 

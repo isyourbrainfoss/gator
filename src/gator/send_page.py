@@ -45,6 +45,8 @@ class SendPage(Gtk.Box):
         self.excluded_items: list[str] = []
         self.send_text: str = ""
         self._error_tag_applied = False
+        self._sent_paths: set[str] = set()
+        self._text_sent = False
         self._build_content()
 
     def _build_content(self) -> None:
@@ -185,7 +187,11 @@ class SendPage(Gtk.Box):
         drop_target.connect("drop", self._on_drop)
         self.files_listbox.add_controller(drop_target)
 
-        controls = Gtk.CenterBox()
+        controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        controls.set_hexpand(True)
+
+        self.send_idle_box = Gtk.Box()
+        self.send_idle_box.set_halign(Gtk.Align.CENTER)
         self.send_start_btn = Gtk.Button()
         self.send_start_btn.add_css_class("suggested-action")
         self.send_start_btn.add_css_class("pill")
@@ -195,29 +201,42 @@ class SendPage(Gtk.Box):
         self.send_start_btn.set_child(send_btn_box)
         self.send_start_btn.set_sensitive(False)
         self.send_start_btn.connect("clicked", lambda *_: self.emit("start-send"))
-        controls.set_center_widget(self.send_start_btn)
+        self.send_idle_box.append(self.send_start_btn)
 
         self.send_transfer_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=6
+            orientation=Gtk.Orientation.VERTICAL, spacing=8
         )
+        self.send_transfer_box.set_hexpand(True)
         transfer_row = Gtk.Box(spacing=12)
+        transfer_row.set_hexpand(True)
+        self.send_status_stack = Gtk.Stack()
+        self.send_status_stack.set_size_request(32, 32)
         self.send_spinner = Gtk.Spinner()
-        self.send_spinner.set_size_request(32, 32)
+        self.send_spinner.set_valign(Gtk.Align.CENTER)
+        self.send_success_icon = self._make_sent_icon(size=24)
+        self.send_status_stack.add_named(self.send_spinner, "spinner")
+        self.send_status_stack.add_named(self.send_success_icon, "success")
         self.send_transfer_label = Gtk.Label(
-            label=_("Preparing"), ellipsize=Pango.EllipsizeMode.END, hexpand=True
+            label=_("Preparing"),
+            ellipsize=Pango.EllipsizeMode.END,
+            hexpand=True,
+            halign=Gtk.Align.START,
         )
-        cancel_btn = Gtk.Button(label=_("Cancel"))
-        cancel_btn.add_css_class("destructive-action")
-        cancel_btn.connect("clicked", lambda *_: self.emit("cancel-send"))
-        transfer_row.append(self.send_spinner)
+        self.send_cancel_btn = Gtk.Button(label=_("Cancel"))
+        self.send_cancel_btn.add_css_class("destructive-action")
+        self.send_cancel_btn.connect("clicked", lambda *_: self.emit("cancel-send"))
+        transfer_row.append(self.send_status_stack)
         transfer_row.append(self.send_transfer_label)
-        transfer_row.append(cancel_btn)
+        transfer_row.append(self.send_cancel_btn)
         self.send_transfer_box.append(transfer_row)
         self.send_progress = Gtk.ProgressBar(show_text=True)
+        self.send_progress.set_hexpand(True)
         self.send_progress.set_visible(False)
         self.send_transfer_box.append(self.send_progress)
         self.send_transfer_box.set_visible(False)
-        controls.set_end_widget(self.send_transfer_box)
+
+        controls.append(self.send_idle_box)
+        controls.append(self.send_transfer_box)
         form.append(controls)
 
         self.transfer_info = Gtk.Box(
@@ -283,6 +302,13 @@ class SendPage(Gtk.Box):
         scroll.set_child(outer)
         self.append(scroll)
 
+    def _make_sent_icon(self, *, size: int = 16) -> Gtk.Image:
+        """Green sent indicator (emblem-ok; symbolic variant is missing in GNOME)."""
+        icon = Gtk.Image.new_from_icon_name("emblem-ok")
+        icon.set_pixel_size(size)
+        icon.set_valign(Gtk.Align.CENTER)
+        return icon
+
     def _on_drop(
         self, drop_target: Gtk.DropTarget, value: Any, _x: float, _y: float
     ) -> bool:
@@ -318,10 +344,19 @@ class SendPage(Gtk.Box):
         self.qr_picture.set_visible(visible)
 
     def set_transfer_active(self, active: bool, label: str = "") -> None:
-        self.send_start_btn.set_visible(not active)
+        self.send_idle_box.set_visible(not active)
         self.send_transfer_box.set_visible(active)
         if active:
+            self._sent_paths.clear()
+            self._text_sent = False
+            self.refresh_file_list(
+                self.selected_files,
+                self.excluded_items,
+                self.send_text,
+            )
+            self.send_status_stack.set_visible_child_name("spinner")
             self.send_spinner.start()
+            self.send_cancel_btn.set_visible(True)
             if label:
                 self.send_transfer_label.set_label(label)
             self.send_progress.set_fraction(0.0)
@@ -330,9 +365,34 @@ class SendPage(Gtk.Box):
             self.send_spinner.stop()
             self.send_progress.set_visible(False)
 
+    def show_transfer_complete(self, *, canceled: bool) -> None:
+        self.send_spinner.stop()
+        self.send_cancel_btn.set_visible(False)
+        if canceled:
+            self.send_status_stack.set_visible_child_name("spinner")
+            self.send_transfer_label.set_label(_("Transfer cancelled"))
+            self.send_progress.set_visible(False)
+        else:
+            self.send_status_stack.set_visible_child_name("success")
+            self.send_transfer_label.set_label(_("Transfer finished"))
+            self.send_progress.set_fraction(1.0)
+            self.send_progress.set_text(_("Done"))
+            self.send_progress.set_visible(True)
+
+    def mark_items_sent(self, paths: list[str], *, text_sent: bool) -> None:
+        self._sent_paths = set(paths)
+        self._text_sent = text_sent
+        self.refresh_file_list(
+            self.selected_files,
+            self.excluded_items,
+            self.send_text,
+        )
+
     def set_progress(self, fraction: float) -> None:
         self.send_progress.set_fraction(fraction)
         self.send_progress.set_text(f"{int(fraction * 100)}%")
+        if fraction > 0:
+            self.send_transfer_label.set_label(_("Sending"))
 
     def show_code(self, code: str) -> None:
         self.code_label.set_label(code)
@@ -367,8 +427,16 @@ class SendPage(Gtk.Box):
 
         for path in selected:
             name = Path(path).name + (_(" (folder)") if os.path.isdir(path) else "")
-            row = Adw.ActionRow(title=name, subtitle=path)
-            row.add_prefix(Gtk.Image.new_from_icon_name("list-add-symbolic"))
+            sent = path in self._sent_paths
+            row = Adw.ActionRow(
+                title=name,
+                subtitle=_("Sent successfully") if sent else path,
+            )
+            if sent:
+                row.add_prefix(self._make_sent_icon())
+                row.add_css_class("success")
+            else:
+                row.add_prefix(Gtk.Image.new_from_icon_name("list-add-symbolic"))
             rm = Gtk.Button(icon_name="edit-delete-symbolic")
             rm.add_css_class("flat")
             set_a11y_label(rm, _("Remove"))
@@ -387,11 +455,19 @@ class SendPage(Gtk.Box):
             self.files_listbox.append(row)
         if send_text:
             collapsed = " ".join(send_text.splitlines())
-            subtitle = collapsed[:50] + ("..." if len(collapsed) > 50 else "")
-            row = Adw.ActionRow(title=_("Text"), subtitle=subtitle)
-            row.add_prefix(
-                Gtk.Image.new_from_icon_name("accessories-text-editor-symbolic")
+            subtitle = (
+                _("Sent successfully")
+                if self._text_sent
+                else collapsed[:50] + ("..." if len(collapsed) > 50 else "")
             )
+            row = Adw.ActionRow(title=_("Text"), subtitle=subtitle)
+            if self._text_sent:
+                row.add_prefix(self._make_sent_icon())
+                row.add_css_class("success")
+            else:
+                row.add_prefix(
+                    Gtk.Image.new_from_icon_name("accessories-text-editor-symbolic")
+                )
             rm = Gtk.Button(icon_name="edit-delete-symbolic")
             rm.add_css_class("flat")
             set_a11y_label(rm, _("Remove"))

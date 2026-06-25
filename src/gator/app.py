@@ -128,7 +128,7 @@ class GatorApp(Adw.Application):
         if self.win:
             self.win.add_toast(title)
 
-    def show_preferences(self, *_) -> None:
+    def show_preferences(self, *_args: Any) -> None:
         self._prefs_dialog = PreferencesDialog(
             self.settings,
             self.save_dir,
@@ -162,7 +162,7 @@ class GatorApp(Adw.Application):
             self.send_page.set_qr_visible(self.settings.get("show_qr_image", True))
         self.add_toast(_("Settings reset to default"))
 
-    def show_about(self, *_: Any) -> None:
+    def show_about(self, *_args: Any) -> None:
         about = Adw.AboutDialog(
             application_name=APP_NAME,
             version=APP_VERSION,
@@ -246,6 +246,8 @@ class GatorApp(Adw.Application):
         self.send_page.selected_files.clear()
         self.send_page.excluded_items.clear()
         self.send_text = ""
+        self.send_page._sent_paths.clear()
+        self.send_page._text_sent = False
         self._update_file_list()
 
     def _on_remove_item(self, _page, path: str, included: bool) -> None:
@@ -294,13 +296,25 @@ class GatorApp(Adw.Application):
 
     def _on_send_finished(self) -> None:
         canceled = self._send_transfer.canceled if self._send_transfer else False
-        self.send_page.set_transfer_active(False)
+        sent_paths = list(self.send_page.selected_files)
+        text_sent = bool(self.send_text)
         msg = _("Transfer cancelled.") if canceled else _("Transfer finished.")
         self.send_page.append_log(msg)
-        self.send_page.hide_code()
         self._send_transfer = None
         self.send_text = ""
-        self._update_file_list()
+        if canceled:
+            self.send_page.show_transfer_complete(canceled=True)
+            GLib.timeout_add(1500, self._reset_send_controls)
+        else:
+            self.send_page.mark_items_sent(sent_paths, text_sent=text_sent)
+            self.send_page.show_transfer_complete(canceled=False)
+            self.add_toast(_("Transfer finished"))
+            GLib.timeout_add(2500, self._reset_send_controls)
+
+    def _reset_send_controls(self) -> bool:
+        self.send_page.set_transfer_active(False)
+        self.send_page.hide_code()
+        return False
 
     def _on_cancel_send(self, _page) -> None:
         if self._send_transfer is not None:

@@ -10,7 +10,11 @@ import gator.settings as S
 
 def test_defaults_present():
     assert "port" in S.DEFAULTS
-    assert S.DEFAULTS["port"] == S.DEFAULT_PORT
+    assert S.DEFAULTS["port"] == 0
+    assert S.DEFAULTS["transfers"] == 0
+    assert S.DEFAULTS["multicast"] == ""
+    assert S.DEFAULTS["hash"] == ""
+    assert S.DEFAULTS["curve"] == ""
     assert S.DEFAULTS["color_scheme"] == "default"
 
 
@@ -21,11 +25,12 @@ def test_validate_clamps_port():
 
     s = {"port": 0}
     out = S.validate_settings(s)
-    assert out["port"] == 1
+    assert out["port"] == 0
 
 
 def test_validate_hash():
-    assert S.validate_settings({"hash": "foo"})["hash"] == "xxhash"
+    assert S.validate_settings({"hash": "foo"})["hash"] == ""
+    assert S.validate_settings({"hash": ""})["hash"] == ""
     assert S.validate_settings({"hash": "imohash"})["hash"] == "imohash"
 
 

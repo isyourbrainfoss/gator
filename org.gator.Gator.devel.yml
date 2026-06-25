@@ -84,3 +84,4 @@ modules:
     post-install:
       - chmod +x /app/bin/gator || true
       - install -Dm644 data/org.gator.Gator.svg /app/share/icons/hicolor/scalable/apps/org.gator.Gator.svg || true
+      - glib-compile-schemas /app/share/glib-2.0/schemas

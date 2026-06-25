@@ -33,11 +33,25 @@ APP_VERSION = "1.4"
 
 CROC_BINARY = "croc"
 
-DEFAULT_PORT = 9009
-DEFAULT_TRANSFERS = 4
-DEFAULT_MULTICAST = "239.255.255.250"
-DEFAULT_RELAY = "37.27.244.215:9009"
-DEFAULT_RELAY6 = "[2a01:4f9:c013:7b04::1]:9009"
+# Unset sentinels — Gator omits these flags and lets croc use its own defaults.
+DEFAULT_PORT = 0
+DEFAULT_TRANSFERS = 0
+DEFAULT_MULTICAST = ""
+DEFAULT_RELAY = ""
+DEFAULT_RELAY6 = ""
+DEFAULT_HASH = ""
+DEFAULT_CURVE = ""
+
+# Croc built-in defaults (UI hints only; never passed unless the user sets a value).
+CROC_DEFAULT_PORT = 9009
+CROC_DEFAULT_TRANSFERS = 4
+CROC_DEFAULT_MULTICAST = "239.255.255.250"
+CROC_DEFAULT_HASH = "xxhash"
+CROC_DEFAULT_CURVE = "p256"
+
+# Pre-v10.4 croc relay defaults; clear so both sides use the same croc default.
+LEGACY_RELAY = "37.27.244.215:9009"
+LEGACY_RELAY6 = "[2a01:4f9:c013:7b04::1]:9009"
 
 # Prefix used by croc when it prints the code (send side)
 CODE_IS_PREFIX = "Code is: "
@@ -60,7 +74,7 @@ DEFAULTS: dict[str, Any] = {
     "ask": False,
     "local": False,
     "internal_dns": False,
-    "multicast": DEFAULT_MULTICAST,
+    "multicast": DEFAULT_MULTICAST,  # empty → croc default
     "ip": "",
     "throttle_upload": "",
     # Relay / Proxy
@@ -71,7 +85,7 @@ DEFAULTS: dict[str, Any] = {
     "connect": "",
     # Sending
     "default_code": "",
-    "hash": "xxhash",
+    "hash": DEFAULT_HASH,
     "zip_folder": False,
     "no_local": False,
     "no_multi": False,
@@ -82,7 +96,7 @@ DEFAULTS: dict[str, Any] = {
     "show_qr_image": True,
     "show_shell_output": False,
     # Advanced / hidden (rarely exposed in UI)
-    "curve": "p256",
+    "curve": DEFAULT_CURVE,
     "testing": False,
     "quiet": False,
     "disable_clipboard": False,
@@ -135,25 +149,28 @@ def reset_to_defaults() -> dict[str, Any]:
 def validate_settings(settings: dict[str, Any]) -> dict[str, Any]:
     """Clamp / normalise a few known fields. Returns a (possibly new) dict."""
     s = dict(settings)
-    # Port
+    # Port: 0 = unset (croc default)
     try:
         p = int(s.get("port", DEFAULT_PORT))
-        s["port"] = max(1, min(65535, p))
+        s["port"] = 0 if p <= 0 else max(1, min(65535, p))
     except Exception:
         s["port"] = DEFAULT_PORT
-    # Transfers
+    # Transfers: 0 = unset (croc default)
     try:
         t = int(s.get("transfers", DEFAULT_TRANSFERS))
-        s["transfers"] = max(1, min(100, t))
+        s["transfers"] = 0 if t <= 0 else max(1, min(100, t))
     except Exception:
         s["transfers"] = DEFAULT_TRANSFERS
-    # Multicast: if empty reset to default
-    mc = (s.get("multicast") or "").strip()
-    if not mc:
-        s["multicast"] = DEFAULT_MULTICAST
-    # Hash whitelist
-    if s.get("hash") not in ("xxhash", "imohash", "md5"):
-        s["hash"] = "xxhash"
+    # Multicast: empty = croc default
+    s["multicast"] = (s.get("multicast") or "").strip()
+    # Hash: empty = croc default; otherwise whitelist
+    h = (s.get("hash") or "").strip()
+    if h and h not in ("xxhash", "imohash", "md5"):
+        s["hash"] = DEFAULT_HASH
+    else:
+        s["hash"] = h
+    # Curve: empty = croc default
+    s["curve"] = (s.get("curve") or "").strip()
     # Color scheme
     if s.get("color_scheme") not in ("default", "light", "dark"):
         s["color_scheme"] = "default"
@@ -214,6 +231,24 @@ class GatorSettings(dict):
             merged = merge_with_defaults(raw)
             validated = validate_settings(merged)
             super().update(validated)
+        self._migrate_stale_settings()
+
+    def _migrate_stale_settings(self) -> None:
+        if self.get("relay") == LEGACY_RELAY:
+            self["relay"] = ""
+        if self.get("relay6") == LEGACY_RELAY6:
+            self["relay6"] = ""
+        # Older Gator versions baked croc defaults into settings; clear them.
+        if self.get("multicast") == CROC_DEFAULT_MULTICAST:
+            self["multicast"] = ""
+        if self.get("hash") == CROC_DEFAULT_HASH:
+            self["hash"] = ""
+        if self.get("curve") == CROC_DEFAULT_CURVE:
+            self["curve"] = ""
+        if self.get("port") == CROC_DEFAULT_PORT:
+            self["port"] = 0
+        if self.get("transfers") == CROC_DEFAULT_TRANSFERS:
+            self["transfers"] = 0
 
     def _gs_key(self, py_key: str) -> str:
         return PY_TO_GS.get(py_key, py_key.replace("_", "-"))
@@ -241,6 +276,14 @@ class GatorSettings(dict):
         if self._gsettings is not None:
             gkey = self._gs_key(key)
             try:
+                if gkey not in self._gsettings.list_keys():
+                    logger.warning(
+                        "GSettings key %s missing from installed schema; "
+                        "rebuild/reinstall the app to persist this setting",
+                        gkey,
+                    )
+                    super().__setitem__(key, value)
+                    return
                 if isinstance(value, bool):
                     self._gsettings.set_boolean(gkey, value)
                 elif isinstance(value, (int, float)):

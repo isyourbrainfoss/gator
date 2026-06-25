@@ -86,7 +86,11 @@ class ReceivePage(Gtk.Box):
         self.folder_row.add_suffix(change_btn)
         form.append(self.folder_row)
 
-        controls = Gtk.CenterBox()
+        controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        controls.set_hexpand(True)
+
+        self.receive_idle_box = Gtk.Box()
+        self.receive_idle_box.set_halign(Gtk.Align.CENTER)
         self.receive_start_btn = Gtk.Button()
         self.receive_start_btn.add_css_class("suggested-action")
         self.receive_start_btn.add_css_class("pill")
@@ -95,18 +99,22 @@ class ReceivePage(Gtk.Box):
         receive_btn_box.append(Gtk.Label(label=_("Start Receiving")))
         self.receive_start_btn.set_child(receive_btn_box)
         self.receive_start_btn.connect("clicked", lambda *_: self.emit("start-receive"))
-        controls.set_center_widget(self.receive_start_btn)
+        self.receive_idle_box.append(self.receive_start_btn)
 
         self.receive_transfer_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=6
+            orientation=Gtk.Orientation.VERTICAL, spacing=8
         )
+        self.receive_transfer_box.set_hexpand(True)
         transfer_row = Gtk.Box(spacing=12)
+        transfer_row.set_hexpand(True)
         self.receive_spinner = Gtk.Spinner()
         self.receive_spinner.set_size_request(32, 32)
+        self.receive_spinner.set_valign(Gtk.Align.CENTER)
         self.receive_transfer_label = Gtk.Label(
             label=_("Waiting for sender"),
             ellipsize=Pango.EllipsizeMode.END,
             hexpand=True,
+            halign=Gtk.Align.START,
         )
         cancel_btn = Gtk.Button(label=_("Cancel"))
         cancel_btn.add_css_class("destructive-action")
@@ -116,10 +124,13 @@ class ReceivePage(Gtk.Box):
         transfer_row.append(cancel_btn)
         self.receive_transfer_box.append(transfer_row)
         self.receive_progress = Gtk.ProgressBar(show_text=True)
+        self.receive_progress.set_hexpand(True)
         self.receive_progress.set_visible(False)
         self.receive_transfer_box.append(self.receive_progress)
         self.receive_transfer_box.set_visible(False)
-        controls.set_end_widget(self.receive_transfer_box)
+
+        controls.append(self.receive_idle_box)
+        controls.append(self.receive_transfer_box)
         form.append(controls)
 
         clamp.set_child(form)
@@ -184,7 +195,7 @@ class ReceivePage(Gtk.Box):
         self.log_expander.set_visible(visible)
 
     def set_transfer_active(self, active: bool) -> None:
-        self.receive_start_btn.set_visible(not active)
+        self.receive_idle_box.set_visible(not active)
         self.receive_transfer_box.set_visible(active)
         self.code_entry.set_sensitive(not active)
         self.receive_btn_box.set_sensitive(not active)

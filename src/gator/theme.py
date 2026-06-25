@@ -8,26 +8,53 @@ if TYPE_CHECKING:
     from gi.repository import Gtk
 
 
-def get_theme_rgba(widget: Gtk.Widget, name: str) -> tuple[float, float, float, float]:
-    """Return RGBA for a named GTK color (e.g. error_color, window_bg_color)."""
-    from gi.repository import Gdk, Gtk
+def _new_gdk_rgba() -> object:
+    """Create a Gdk RGBA object (PyGObject uses RGBA; older builds used Rgba)."""
+    from gi.repository import Gdk
 
-    style_context = widget.get_style_context()
-    provider = Gtk.CssProvider()
-    provider.load_from_string(f"dummy {{ color: @{name}; }}")
-    style_context.add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-    rgba = Gdk.Rgba()
-    if not style_context.lookup_color("color", rgba):
-        rgba.red = rgba.green = rgba.blue = 0.5
-        rgba.alpha = 1.0
-    style_context.remove_provider(provider)
+    if hasattr(Gdk, "RGBA"):
+        return Gdk.RGBA()
+    return Gdk.Rgba()  # type: ignore[attr-defined,no-any-return]
+
+
+def get_theme_rgba(widget: Gtk.Widget, name: str) -> tuple[float, float, float, float]:
+    """Return RGBA for a named GTK/libadwaita color (e.g. error_color)."""
+    rgba = _new_gdk_rgba()
+    found = False
+    try:
+        style_context = widget.get_style_context()
+        result = style_context.lookup_color(name)
+        if isinstance(result, tuple) and len(result) == 2:
+            found, rgba = result
+        elif result:
+            # GTK3-style out-parameter API (local dev fallbacks)
+            found = bool(result)
+    except TypeError:
+        # GTK3: lookup_color(name, rgba_out) -> bool
+        try:
+            found = style_context.lookup_color(name, rgba)  # type: ignore[call-arg]
+        except Exception:
+            found = False
+    except Exception:
+        found = False
+
+    if not found:
+        if name in ("window_fg_color", "foreground"):
+            fg = widget.get_color()
+            return (fg.red, fg.green, fg.blue, fg.alpha)
+        return (0.5, 0.5, 0.5, 1.0)
+
     return (rgba.red, rgba.green, rgba.blue, rgba.alpha)
 
 
 def rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
-    """Convert normalized RGBA to #rrggbb."""
+    """Convert normalized RGBA to #rrggbb (clamped to sRGB range)."""
     r, g, b, _a = rgba
-    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+
+    def channel(value: float) -> int:
+        return int(max(0.0, min(1.0, value)) * 255)
+
+    return f"#{channel(r):02x}{channel(g):02x}{channel(b):02x}"
 
 
 def qr_colors_for_widget(widget: Gtk.Widget) -> tuple[str, str]:

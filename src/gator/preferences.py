@@ -13,7 +13,7 @@ from gi.repository import Adw, Gtk
 
 from .a11y import set_a11y_label
 from .i18n import _
-from .settings import DEFAULT_PORT, DEFAULT_TRANSFERS
+from .settings import CROC_DEFAULT_MULTICAST, CROC_DEFAULT_PORT, CROC_DEFAULT_TRANSFERS
 
 if TYPE_CHECKING:
     from .settings import GatorSettings
@@ -180,7 +180,7 @@ class PreferencesDialog:
             self._make_entry_row(
                 "multicast",
                 _("Multicast address for local discovery"),
-                tooltip="239.255.255.250",
+                tooltip=_("Leave empty for croc default (%s)") % CROC_DEFAULT_MULTICAST,
             )
         )
         general.add(
@@ -202,14 +202,16 @@ class PreferencesDialog:
         relay_proxy = Adw.PreferencesGroup(title=_("Relay and Proxy"))
         relay_proxy.add(
             self._make_entry_row(
-                "relay", _("Relay address"), tooltip="37.27.244.215:9009"
+                "relay",
+                _("Relay address"),
+                tooltip=_("Leave empty to use the croc default relay"),
             )
         )
         relay_proxy.add(
             self._make_entry_row(
                 "relay6",
                 _("IPv6 relay address"),
-                tooltip="[2a01:4f9:c013:7b04::1]:9009",
+                tooltip=_("Optional; leave empty unless you need IPv6 relay"),
             )
         )
         pass_row = Adw.PasswordEntryRow(title=_("Relay password"))
@@ -233,21 +235,17 @@ class PreferencesDialog:
                 tooltip=_("Optional – leave empty for a random code"),
             )
         )
-        hash_options = [_("xxhash (default)"), "imohash", "md5"]
+        hash_options = [_("Default (croc)"), "imohash", "md5"]
         hash_row = Adw.ComboRow(title=_("Hash algorithm"))
         hash_row.set_model(Gtk.StringList.new(hash_options))
-        current_hash = self.settings.get("hash", "xxhash")
+        current_hash = (self.settings.get("hash") or "").strip()
         hash_row.set_selected(
-            hash_options.index(
-                _("xxhash (default)") if current_hash == "xxhash" else current_hash
-            )
-            if current_hash in ("xxhash", "imohash", "md5")
-            else 0
+            hash_options.index(current_hash) if current_hash in hash_options[1:] else 0
         )
 
         def on_hash_changed(c: Adw.ComboRow, *_: Any) -> None:
             label = c.get_selected_item().get_string()
-            hash_val = "xxhash" if label.startswith("xxhash") else label
+            hash_val = "" if label == _("Default (croc)") else label
             self.settings.update({"hash": hash_val})
             self.settings.save()
 
@@ -259,9 +257,10 @@ class PreferencesDialog:
         sending.add(self._make_switch_row("git", _("Respect .gitignore")))
         port_row = Adw.SpinRow(
             title=_("Base port for relay"),
+            subtitle=_("0 = croc default (%d)") % CROC_DEFAULT_PORT,
             adjustment=Gtk.Adjustment(
-                value=self.settings.get("port", DEFAULT_PORT),
-                lower=1,
+                value=self.settings.get("port", 0),
+                lower=0,
                 upper=65535,
                 step_increment=1,
             ),
@@ -275,9 +274,10 @@ class PreferencesDialog:
         sending.add(port_row)
         transfers_row = Adw.SpinRow(
             title=_("Number of ports for transfers"),
+            subtitle=_("0 = croc default (%d)") % CROC_DEFAULT_TRANSFERS,
             adjustment=Gtk.Adjustment(
-                value=self.settings.get("transfers", DEFAULT_TRANSFERS),
-                lower=1,
+                value=self.settings.get("transfers", 0),
+                lower=0,
                 upper=100,
                 step_increment=1,
             ),

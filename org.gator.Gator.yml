@@ -110,5 +110,4 @@ modules:
       # Ensure the entry point is executable
       - chmod +x /app/bin/gator || true
       - install -Dm644 data/org.gator.Gator.svg /app/share/icons/hicolor/scalable/apps/org.gator.Gator.svg || true
-
-  # Schemas etc are handled in the meson post-install step above
+      - glib-compile-schemas /app/share/glib-2.0/schemas

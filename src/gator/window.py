@@ -167,7 +167,6 @@ class GatorWindow(Adw.ApplicationWindow):
         popover = self._menu_popover
         if popover is None:
             return
-        popover.set_parent(self)
         popover.set_halign(Gtk.Align.END)
         popover.set_position(Gtk.PositionType.BOTTOM)
         popover.set_overflow(Gtk.Overflow.HIDDEN)

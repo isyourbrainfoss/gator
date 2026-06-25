@@ -32,26 +32,26 @@
     <key name="ask" type="b"><default>false</default></key>
     <key name="local" type="b"><default>false</default></key>
     <key name="internal-dns" type="b"><default>false</default></key>
-    <key name="multicast" type="s"><default>'239.255.255.250'</default></key>
+    <key name="multicast" type="s"><default>''</default></key>
     <key name="ip" type="s"><default>''</default></key>
     <key name="throttle-upload" type="s"><default>''</default></key>
 
     <!-- Relay/Proxy -->
-    <key name="relay" type="s"><default>'37.27.244.215:9009'</default></key>
-    <key name="relay6" type="s"><default>'[2a01:4f9:c013:7b04::1]:9009'</default></key>
+    <key name="relay" type="s"><default>''</default></key>
+    <key name="relay6" type="s"><default>''</default></key>
     <key name="pass" type="s"><default>''</default></key>
     <key name="socks5" type="s"><default>''</default></key>
     <key name="connect" type="s"><default>''</default></key>
 
     <!-- Sending -->
     <key name="default-code" type="s"><default>''</default></key>
-    <key name="hash" type="s"><default>'xxhash'</default></key>
+    <key name="hash" type="s"><default>''</default></key>
     <key name="zip-folder" type="b"><default>false</default></key>
     <key name="no-local" type="b"><default>false</default></key>
     <key name="no-multi" type="b"><default>false</default></key>
     <key name="git" type="b"><default>false</default></key>
-    <key name="port" type="i"><default>9009</default><range min="1" max="65535"/></key>
-    <key name="transfers" type="i"><default>4</default><range min="1" max="100"/></key>
+    <key name="port" type="i"><default>0</default><range min="0" max="65535"/></key>
+    <key name="transfers" type="i"><default>0</default><range min="0" max="100"/></key>
     <key name="qr" type="b"><default>false</default></key>
     <key name="show-qr-image" type="b">
       <default>true</default>
@@ -62,7 +62,7 @@
       <summary>Show croc shell output log panels</summary>
     </key>
     <key name="curve" type="s">
-      <default>'p256'</default>
+      <default>''</default>
       <summary>Encryption curve</summary>
     </key>
     <key name="testing" type="b"><default>false</default></key>

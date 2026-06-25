@@ -14,17 +14,19 @@ from typing import Any
 
 from gi.repository import Gio, GLib
 
-from .settings import (
-    CODE_IS_PREFIX,
-    CROC_BINARY,
-    DEFAULT_MULTICAST,
-    DEFAULT_PORT,
-    DEFAULT_TRANSFERS,
-)
+from .settings import CODE_IS_PREFIX, CROC_BINARY
 
 logger = logging.getLogger(__name__)
 
 _PROGRESS_RE = re.compile(r"(\d{1,3})%")
+_CODE_IS_RE = re.compile(r"^code is:\s*", re.IGNORECASE)
+
+
+def normalize_croc_code(code: str) -> str:
+    """Normalize a user-entered croc code (paste quirks, spacing)."""
+    normalized = code.strip()
+    normalized = _CODE_IS_RE.sub("", normalized)
+    return normalized.replace(" ", "-")
 
 
 def parse_progress_fraction(line: str) -> float | None:
@@ -38,11 +40,39 @@ def parse_progress_fraction(line: str) -> float | None:
     return None
 
 
+def split_croc_output(
+    chunk: str, buffer: str = ""
+) -> tuple[str, list[tuple[str, bool]]]:
+    """Split croc stdout on ``\\n`` and ``\\r``.
+
+    Croc redraws transfer progress with carriage returns when stdout is not a TTY.
+    Returns ``(remaining_buffer, [(segment, from_newline), ...])``.
+    """
+    buf = buffer + chunk
+    segments: list[tuple[str, bool]] = []
+    while True:
+        idx_n = buf.find("\n")
+        idx_r = buf.find("\r")
+        if idx_n == -1 and idx_r == -1:
+            break
+        if idx_n == -1:
+            idx, from_newline = idx_r, False
+        elif idx_r == -1:
+            idx, from_newline = idx_n, True
+        else:
+            idx, from_newline = (idx_r, False) if idx_r < idx_n else (idx_n, True)
+        segment = buf[:idx]
+        buf = buf[idx + 1 :]
+        if segment:
+            segments.append((segment, from_newline))
+    return buf, segments
+
+
 def build_global_args(settings: dict[str, Any]) -> list[str]:
     """Build croc global flags from a settings dict."""
     args: list[str] = []
-    curve = settings.get("curve", "p256")
-    if curve != "p256":
+    curve = (settings.get("curve") or "").strip()
+    if curve:
         args += ["--curve", curve]
     relay = settings.get("relay", "").strip()
     if relay:
@@ -75,8 +105,8 @@ def build_global_args(settings: dict[str, Any]) -> list[str]:
         args += ["--disable-clipboard"]
     if settings.get("extended_clipboard", False):
         args += ["--extended-clipboard"]
-    multicast = settings.get("multicast", DEFAULT_MULTICAST).strip()
-    if multicast != DEFAULT_MULTICAST:
+    multicast = (settings.get("multicast") or "").strip()
+    if multicast:
         args += ["--multicast", multicast]
     ip = settings.get("ip", "").strip()
     if ip:
@@ -105,7 +135,10 @@ class CrocTransfer:
         self._proc: Gio.Subprocess | None = None
         self._stream: Gio.DataInputStream | None = None
         self.canceled = False
+        self._finished = False
+        self._waiting_exit = False
         self._lines: list[str] = []
+        self._read_buf = ""
         self._on_log = on_log
         self._on_finished = on_finished
         self._on_progress = on_progress
@@ -113,7 +146,10 @@ class CrocTransfer:
     def start(self) -> None:
         """Launch croc asynchronously on the GLib main loop."""
         self.canceled = False
+        self._finished = False
+        self._waiting_exit = False
         self._lines = []
+        self._read_buf = ""
         try:
             self._launch()
         except GLib.Error as e:
@@ -123,12 +159,18 @@ class CrocTransfer:
 
     def cancel(self) -> None:
         """Terminate the running subprocess."""
+        if self.canceled or self._finished:
+            return
         self.canceled = True
-        if self._proc is not None:
-            try:
-                self._proc.send_signal(9)
-            except GLib.Error as e:
-                logger.warning("Failed to cancel croc: %s", e.message)
+        proc = self._proc
+        if proc is None:
+            self._cleanup()
+            return
+        try:
+            proc.force_exit()
+        except GLib.Error as e:
+            logger.warning("Failed to cancel croc: %s", e.message)
+        self._wait_for_exit()
 
     def _launch(self) -> None:
         raise NotImplementedError
@@ -152,35 +194,67 @@ class CrocTransfer:
             self._wait_for_exit()
             return
         self._stream = Gio.DataInputStream.new(pipe)
-        self._read_line()
+        self._read_chunk()
 
-    def _read_line(self) -> None:
+    def _read_chunk(self) -> None:
         if self._stream is None:
             self._wait_for_exit()
             return
-        self._stream.read_line_async(
+        self._stream.read_bytes_async(
+            4096,
             GLib.PRIORITY_DEFAULT,
             None,
-            self._on_read_line,
+            self._on_read_chunk,
             None,
         )
 
-    def _on_read_line(
-        self, _stream: Gio.DataInputStream, result: Gio.AsyncResult
+    def _on_read_chunk(
+        self,
+        _stream: Gio.DataInputStream,
+        result: Gio.AsyncResult,
+        *_user_data: Any,
     ) -> None:
+        if self._finished:
+            return
+        if self._stream is None:
+            self._wait_for_exit()
+            return
         try:
-            line, _length = self._stream.read_line_finish_utf8(result)  # type: ignore[union-attr]
+            data = self._stream.read_bytes_finish(result)
         except GLib.Error:
             self._wait_for_exit()
             return
-        if line is not None:
-            stripped = line.rstrip("\n")
+        if data.get_size() == 0:
+            self._flush_read_buffer()
+            self._wait_for_exit()
+            return
+        chunk = bytes(data.get_data()).decode("utf-8", errors="replace")
+        self._consume_output(chunk)
+        self._read_chunk()
+
+    def _consume_output(self, chunk: str) -> None:
+        self._read_buf, segments = split_croc_output(chunk, self._read_buf)
+        for segment, from_newline in segments:
+            self._emit_segment(segment, from_newline=from_newline)
+        trailing = self._read_buf.rstrip()
+        if trailing:
+            self._handle_line(trailing)
+
+    def _flush_read_buffer(self) -> None:
+        trailing = self._read_buf.rstrip()
+        if trailing:
+            self._emit_segment(trailing, from_newline=True)
+        self._read_buf = ""
+
+    def _emit_segment(self, segment: str, *, from_newline: bool) -> None:
+        stripped = segment.rstrip()
+        if not stripped:
+            return
+        is_progress = parse_progress_fraction(stripped) is not None
+        if from_newline or not is_progress:
             self._lines.append(stripped)
             self._on_log(stripped)
-            self._handle_line(stripped)
-            self._read_line()
-        else:
-            self._wait_for_exit()
+        self._handle_line(stripped)
 
     def _handle_line(self, line: str) -> None:
         if self._on_progress is not None:
@@ -189,9 +263,14 @@ class CrocTransfer:
                 self._on_progress(fraction)
 
     def _wait_for_exit(self) -> None:
+        if self._finished:
+            return
         if self._proc is None:
             self._cleanup()
             return
+        if self._waiting_exit:
+            return
+        self._waiting_exit = True
         self._proc.wait_async(None, self._on_wait_complete)
 
     def _on_wait_complete(self, proc: Gio.Subprocess, result: Gio.AsyncResult) -> None:
@@ -202,6 +281,9 @@ class CrocTransfer:
         self._cleanup()
 
     def _cleanup(self) -> None:
+        if self._finished:
+            return
+        self._finished = True
         self._proc = None
         self._stream = None
         self._on_finished()
@@ -236,8 +318,8 @@ class CrocSendTransfer(CrocTransfer):
         custom = s.get("default_code", "").strip()
         if custom:
             args += ["--code", custom]
-        hash_alg = s.get("hash", "xxhash")
-        if hash_alg != "xxhash":
+        hash_alg = (s.get("hash") or "").strip()
+        if hash_alg:
             args += ["--hash", hash_alg]
         if s.get("zip_folder", False):
             args += ["--zip"]
@@ -249,11 +331,11 @@ class CrocSendTransfer(CrocTransfer):
             args += ["--no-multi"]
         if s.get("git", False):
             args += ["--git"]
-        port = s.get("port", DEFAULT_PORT)
-        if port != DEFAULT_PORT:
+        port = int(s.get("port") or 0)
+        if port > 0:
             args += ["--port", str(port)]
-        transfers = s.get("transfers", DEFAULT_TRANSFERS)
-        if transfers != DEFAULT_TRANSFERS:
+        transfers = int(s.get("transfers") or 0)
+        if transfers > 0:
             args += ["--transfers", str(transfers)]
         if s.get("qr", False):
             args += ["--qr"]
@@ -335,11 +417,16 @@ class CrocReceiveTransfer(CrocTransfer):
             self._before = set(os.listdir(self._save_dir))
         except OSError:
             self._before = set()
-        env = os.environ.copy()
-        env["CROC_SECRET"] = self._code
+        code = normalize_croc_code(self._code)
+        self._code = code
         args = [CROC_BINARY] + build_global_args(self._settings)
-        self._on_log(f'Receiving with code "{self._code}"')
-        self._spawn(args, env=env, cwd=self._save_dir)
+        if "--yes" not in args:
+            args += ["--yes"]
+        args.append(code)
+        display = [f'"{a}"' if " " in a else a for a in args]
+        self._on_log(f"Running: {' '.join(display)}")
+        self._on_log(f'Receiving with code "{code}"')
+        self._spawn(args, cwd=self._save_dir)
 
     def _on_wait_complete(self, proc: Gio.Subprocess, result: Gio.AsyncResult) -> None:
         try:

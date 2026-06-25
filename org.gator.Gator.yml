@@ -105,7 +105,7 @@ modules:
       - type: git
         url: https://github.com/isyourbrainfoss/gator.git
         tag: v1.5
-        commit: c058bc07ba098fe9f17b4812be0f661be0d3243d
+        commit: a3cf447c1d1b6c9a98bec375cd5762b4561ff62b
     post-install:
       # Ensure the entry point is executable
       - chmod +x /app/bin/gator || true

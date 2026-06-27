@@ -12,6 +12,7 @@ from gator.transfer import (
     detect_transfer_phase,
     normalize_croc_code,
     parse_progress_fraction,
+    is_croc_status_line,
     receive_env_for_code,
     split_croc_output,
 )
@@ -205,20 +206,14 @@ def test_receive_env_for_code():
     assert env == {"CROC_SECRET": "1234-test-code"}
 
 
-def test_is_likely_content_rejects_croc_unix_help():
-    from gator.transfer import CrocReceiveTransfer
-
-    t = CrocReceiveTransfer(
-        settings={},
-        code="x",
-        save_dir="/tmp",
-        on_log=lambda _m: None,
-        on_text_received=lambda _t: None,
-        on_transfer_complete=lambda: None,
-        on_finished=lambda: None,
-    )
-    line = "On UNIX systems, to receive with croc you either need"
-    assert not t._is_likely_content_line(line)
+def test_is_croc_status_line_filters_cli_output():
+    assert is_croc_status_line("connecting...")
+    assert is_croc_status_line("securing channel...")
+    assert is_croc_status_line("Accept 'wg0.conf_ivpn' (303 B)? (Y/n)")
+    assert is_croc_status_line("Receiving (<-83.109.115.4:35166)")
+    assert is_croc_status_line("On UNIX systems, to receive with croc you either need")
+    assert not is_croc_status_line("hello from sender")
+    assert not is_croc_status_line("Line one of a note")
 
 
 def test_receive_transfer_construction():

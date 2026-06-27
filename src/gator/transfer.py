@@ -20,6 +20,51 @@ logger = logging.getLogger(__name__)
 
 _PROGRESS_RE = re.compile(r"(\d{1,3})%")
 _CODE_IS_RE = re.compile(r"^code is:\s*", re.IGNORECASE)
+_ACCEPT_PROMPT_RE = re.compile(r"^Accept .+ \(.*\)\? \(Y/n\)", re.IGNORECASE)
+_CROC_STATUS_PREFIXES = (
+    "connecting",
+    "securing channel",
+    "receiving (<-",
+    "receiving (->",
+    "sending (<-",
+    "sending (->",
+    "running:",
+    "waiting",
+    "receiving file (",
+    "code is:",
+)
+_CROC_STATUS_SUBSTRINGS = (
+    "transfer finished",
+    "code is invalid",
+    "on unix systems",
+    "croc_secret",
+    "classic mode",
+    "enter receive code",
+    "(y/n)",
+    "room (secure channel)",
+    "peer disconnected",
+    "peer error",
+    "refusing files",
+)
+
+
+def is_croc_status_line(line: str) -> bool:
+    """True if *line* is croc CLI status output, not received text payload."""
+    s = line.strip()
+    if not s:
+        return True
+    if "%" in s or "|" in s:
+        return True
+    low = s.lower()
+    if low.startswith(_CROC_STATUS_PREFIXES):
+        return True
+    if _ACCEPT_PROMPT_RE.match(s):
+        return True
+    if any(sub in low for sub in _CROC_STATUS_SUBSTRINGS):
+        return True
+    if low.startswith("sending ") and "code is:" not in low:
+        return True
+    return False
 
 
 def normalize_croc_code(code: str) -> str:
@@ -423,29 +468,7 @@ class CrocReceiveTransfer(CrocTransfer):
         self._saw_file_indicator = False
 
     def _is_likely_content_line(self, line: str) -> bool:
-        s = line.strip()
-        if not s:
-            return False
-        if "%" in s or "|" in s:
-            return False
-        low = s.lower()
-        if s.startswith("Receiving file ("):
-            return False
-        if "transfer finished" in low:
-            return False
-        if "code is invalid" in low:
-            return False
-        if s.startswith("Code is:"):
-            return False
-        if "error" in low and len(s) < 80:
-            return False
-        if s.startswith("Waiting") or s.startswith("Sending"):
-            return False
-        if "on unix systems" in low or "croc_secret" in low:
-            return False
-        if "classic mode" in low or "enter receive code" in low:
-            return False
-        return True
+        return not is_croc_status_line(line)
 
     def _handle_line(self, line: str) -> None:
         super()._handle_line(line)
@@ -479,7 +502,6 @@ class CrocReceiveTransfer(CrocTransfer):
         self._cleanup()
 
     def _post_process(self) -> None:
-        text_lines = [ln for ln in self._lines if self._is_likely_content_line(ln)]
         received_files = False
         try:
             after = set(os.listdir(self._save_dir))
@@ -490,8 +512,10 @@ class CrocReceiveTransfer(CrocTransfer):
         except OSError:
             received_files = self._saw_file_indicator
 
+        text_lines = [ln for ln in self._lines if self._is_likely_content_line(ln)]
         text_delivered = False
-        if text_lines:
+        # Stdout lines are only text payload for text-only transfers (no files).
+        if text_lines and not received_files and not self._saw_file_indicator:
             text = "\n".join(text_lines).strip()
             if text:
                 self._on_text_received(text)

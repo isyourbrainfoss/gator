@@ -41,9 +41,14 @@ def detect_transfer_phase(line: str) -> str | None:
     return None
 
 
-def build_receive_args(settings: dict[str, Any], code: str) -> list[str]:
-    """Build argv for a croc receive invocation."""
-    return [CROC_BINARY] + build_global_args(settings) + [normalize_croc_code(code)]
+def build_receive_args(settings: dict[str, Any]) -> list[str]:
+    """Build argv for a croc receive invocation (code goes in ``CROC_SECRET``)."""
+    return [CROC_BINARY] + build_global_args(settings)
+
+
+def receive_env_for_code(code: str) -> dict[str, str]:
+    """Env vars croc v10+ expects for non-TTY receive (no positional code)."""
+    return {"CROC_SECRET": normalize_croc_code(code)}
 
 
 def parse_progress_fraction(line: str) -> float | None:
@@ -388,7 +393,7 @@ class CrocSendTransfer(CrocTransfer):
 
 
 class CrocReceiveTransfer(CrocTransfer):
-    """Wraps croc receive (via CROC_SECRET) using Gio.Subprocess."""
+    """Wraps croc receive using ``CROC_SECRET`` (required for non-TTY v10+)."""
 
     def __init__(
         self,
@@ -436,6 +441,10 @@ class CrocReceiveTransfer(CrocTransfer):
             return False
         if s.startswith("Waiting") or s.startswith("Sending"):
             return False
+        if "on unix systems" in low or "croc_secret" in low:
+            return False
+        if "classic mode" in low or "enter receive code" in low:
+            return False
         return True
 
     def _handle_line(self, line: str) -> None:
@@ -450,11 +459,15 @@ class CrocReceiveTransfer(CrocTransfer):
             self._before = set()
         code = normalize_croc_code(self._code)
         self._code = code
-        args = build_receive_args(self._settings, code)
+        if not code:
+            self._on_log("Error: no transfer code")
+            self._on_finished()
+            return
+        args = build_receive_args(self._settings)
         display = [f'"{a}"' if " " in a else a for a in args]
-        self._on_log(f"Running: {' '.join(display)}")
+        self._on_log(f"Running: CROC_SECRET=*** {' '.join(display)}")
         self._on_log(f'Receiving with code "{code}"')
-        self._spawn(args, cwd=self._save_dir)
+        self._spawn(args, env=receive_env_for_code(code), cwd=self._save_dir)
 
     def _on_wait_complete(self, proc: Gio.Subprocess, result: Gio.AsyncResult) -> None:
         try:

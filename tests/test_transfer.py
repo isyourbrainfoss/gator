@@ -12,6 +12,7 @@ from gator.transfer import (
     detect_transfer_phase,
     normalize_croc_code,
     parse_progress_fraction,
+    receive_env_for_code,
     split_croc_output,
 )
 
@@ -186,16 +187,38 @@ def test_detect_transfer_phase():
 
 
 def test_receive_build_args_respects_yes_pref():
-    args = build_receive_args({"yes": False, "relay": ""}, "1234-test-code")
-    assert args[-1] == "1234-test-code"
+    args = build_receive_args({"yes": False, "relay": ""})
+    assert args[0] == "croc"
     assert "--relay" not in args
     assert "--yes" not in args
+    assert len(args) == 1
 
 
 def test_receive_build_args_with_yes():
-    args = build_receive_args({"yes": True}, "abc-code")
+    args = build_receive_args({"yes": True})
     assert "--yes" in args
-    assert args[-1] == "abc-code"
+    assert "abc-code" not in args
+
+
+def test_receive_env_for_code():
+    env = receive_env_for_code("Code is: 1234 test code")
+    assert env == {"CROC_SECRET": "1234-test-code"}
+
+
+def test_is_likely_content_rejects_croc_unix_help():
+    from gator.transfer import CrocReceiveTransfer
+
+    t = CrocReceiveTransfer(
+        settings={},
+        code="x",
+        save_dir="/tmp",
+        on_log=lambda _m: None,
+        on_text_received=lambda _t: None,
+        on_transfer_complete=lambda: None,
+        on_finished=lambda: None,
+    )
+    line = "On UNIX systems, to receive with croc you either need"
+    assert not t._is_likely_content_line(line)
 
 
 def test_receive_transfer_construction():

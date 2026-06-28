@@ -57,6 +57,31 @@ def rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
     return f"#{channel(r):02x}{channel(g):02x}{channel(b):02x}"
 
 
+_SUCCESS_ICON_NAMES = ("emblem-ok", "object-select-symbolic", "check-plain-symbolic")
+
+
+def resolve_success_icon_name(widget: Gtk.Widget) -> str:
+    """Pick a success/check icon available in the current icon theme."""
+    from gi.repository import Gtk
+
+    theme = Gtk.IconTheme.get_for_display(widget.get_display())
+    for name in _SUCCESS_ICON_NAMES:
+        if theme.has_icon(name):
+            return name
+    return "check-plain-symbolic"
+
+
+def make_success_icon(widget: Gtk.Widget, *, size: int = 16) -> Gtk.Image:
+    """Green check indicator (avoids missing ``emblem-ok-symbolic`` in GNOME)."""
+    from gi.repository import Gtk
+
+    icon = Gtk.Image.new_from_icon_name(resolve_success_icon_name(widget))
+    icon.set_pixel_size(size)
+    icon.set_valign(Gtk.Align.CENTER)
+    icon.set_halign(Gtk.Align.CENTER)
+    return icon
+
+
 def qr_colors_for_widget(widget: Gtk.Widget) -> tuple[str, str]:
     """Return (foreground, background) hex colors for QR generation."""
     fg = rgba_to_hex(get_theme_rgba(widget, "window_fg_color"))

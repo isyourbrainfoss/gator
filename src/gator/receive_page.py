@@ -12,7 +12,12 @@ from gi.repository import Adw, Gdk, GObject, Gtk, Pango
 
 from .a11y import set_a11y_label
 from .i18n import _
-from .theme import get_theme_rgba, rgba_to_hex
+from .theme import (
+    get_theme_rgba,
+    make_success_icon,
+    resolve_success_icon_name,
+    rgba_to_hex,
+)
 
 if TYPE_CHECKING:
     from .settings import GatorSettings
@@ -39,12 +44,6 @@ class ReceivePage(Gtk.Box):
         self._error_tag_applied = False
         self._receive_success = False
         self._build_content()
-
-    def _make_success_icon(self, *, size: int = 16) -> Gtk.Image:
-        icon = Gtk.Image.new_from_icon_name("emblem-ok")
-        icon.set_pixel_size(size)
-        icon.set_valign(Gtk.Align.CENTER)
-        return icon
 
     def _build_content(self) -> None:
         outer = Gtk.Box(
@@ -85,7 +84,8 @@ class ReceivePage(Gtk.Box):
         self.folder_row = Adw.ActionRow(
             title=_("Save to folder"), subtitle=self._save_dir
         )
-        self.folder_row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
+        self.folder_icon = Gtk.Image.new_from_icon_name("folder-symbolic")
+        self.folder_row.add_prefix(self.folder_icon)
         change_btn = Gtk.Button(icon_name="document-open-symbolic")
         change_btn.set_tooltip_text(_("Change folder"))
         set_a11y_label(change_btn, _("Change folder"))
@@ -114,13 +114,15 @@ class ReceivePage(Gtk.Box):
         self.receive_transfer_box.set_hexpand(True)
         transfer_row = Gtk.Box(spacing=12)
         transfer_row.set_hexpand(True)
-        self.receive_status_stack = Gtk.Stack()
-        self.receive_status_stack.set_size_request(32, 32)
+        self.receive_status_box = Gtk.Box()
+        self.receive_status_box.set_size_request(32, 32)
         self.receive_spinner = Gtk.Spinner()
         self.receive_spinner.set_valign(Gtk.Align.CENTER)
-        self.receive_success_icon = self._make_success_icon(size=24)
-        self.receive_status_stack.add_named(self.receive_spinner, "spinner")
-        self.receive_status_stack.add_named(self.receive_success_icon, "success")
+        self.receive_spinner.set_halign(Gtk.Align.CENTER)
+        self.receive_success_icon = make_success_icon(self, size=24)
+        self.receive_success_icon.set_visible(False)
+        self.receive_status_box.append(self.receive_spinner)
+        self.receive_status_box.append(self.receive_success_icon)
         self.receive_transfer_label = Gtk.Label(
             label=_("Waiting for sender"),
             ellipsize=Pango.EllipsizeMode.END,
@@ -132,7 +134,7 @@ class ReceivePage(Gtk.Box):
         self.receive_cancel_btn.connect(
             "clicked", lambda *_: self.emit("cancel-receive")
         )
-        transfer_row.append(self.receive_status_stack)
+        transfer_row.append(self.receive_status_box)
         transfer_row.append(self.receive_transfer_label)
         transfer_row.append(self.receive_cancel_btn)
         self.receive_transfer_box.append(transfer_row)
@@ -215,7 +217,8 @@ class ReceivePage(Gtk.Box):
         if active:
             self._receive_success = False
             self._update_folder_row_success()
-            self.receive_status_stack.set_visible_child_name("spinner")
+            self.receive_success_icon.set_visible(False)
+            self.receive_spinner.set_visible(True)
             self.receive_spinner.start()
             self.receive_cancel_btn.set_visible(True)
             self.receive_transfer_label.set_label(_("Waiting for sender"))
@@ -238,13 +241,15 @@ class ReceivePage(Gtk.Box):
         self.receive_spinner.stop()
         self.receive_cancel_btn.set_visible(False)
         if canceled:
-            self.receive_status_stack.set_visible_child_name("spinner")
+            self.receive_success_icon.set_visible(False)
+            self.receive_spinner.set_visible(True)
             self.receive_transfer_label.set_label(_("Transfer cancelled"))
             self.receive_progress.set_visible(False)
         else:
             self._receive_success = True
             self._update_folder_row_success()
-            self.receive_status_stack.set_visible_child_name("success")
+            self.receive_spinner.set_visible(False)
+            self.receive_success_icon.set_visible(True)
             self.receive_transfer_label.set_label(_("Transfer finished"))
             self.receive_progress.set_fraction(1.0)
             self.receive_progress.set_text(_("Done"))
@@ -252,9 +257,11 @@ class ReceivePage(Gtk.Box):
 
     def _update_folder_row_success(self) -> None:
         if self._receive_success:
+            self.folder_icon.set_from_icon_name(resolve_success_icon_name(self))
             self.folder_row.set_subtitle(_("Received successfully"))
             self.folder_row.add_css_class("success")
         else:
+            self.folder_icon.set_from_icon_name("folder-symbolic")
             self.folder_row.set_subtitle(self._save_dir)
             self.folder_row.remove_css_class("success")
 

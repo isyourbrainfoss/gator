@@ -12,7 +12,7 @@ from gi.repository import Adw, Gdk, GObject, Gtk, Pango
 
 from .a11y import set_a11y_label
 from .i18n import _
-from .theme import get_theme_rgba, rgba_to_hex
+from .theme import get_theme_rgba, make_success_icon, rgba_to_hex
 
 if TYPE_CHECKING:
     from gi.repository import Gdk
@@ -209,13 +209,15 @@ class SendPage(Gtk.Box):
         self.send_transfer_box.set_hexpand(True)
         transfer_row = Gtk.Box(spacing=12)
         transfer_row.set_hexpand(True)
-        self.send_status_stack = Gtk.Stack()
-        self.send_status_stack.set_size_request(32, 32)
+        self.send_status_box = Gtk.Box()
+        self.send_status_box.set_size_request(32, 32)
         self.send_spinner = Gtk.Spinner()
         self.send_spinner.set_valign(Gtk.Align.CENTER)
-        self.send_success_icon = self._make_sent_icon(size=24)
-        self.send_status_stack.add_named(self.send_spinner, "spinner")
-        self.send_status_stack.add_named(self.send_success_icon, "success")
+        self.send_spinner.set_halign(Gtk.Align.CENTER)
+        self.send_success_icon = make_success_icon(self, size=24)
+        self.send_success_icon.set_visible(False)
+        self.send_status_box.append(self.send_spinner)
+        self.send_status_box.append(self.send_success_icon)
         self.send_transfer_label = Gtk.Label(
             label=_("Preparing"),
             ellipsize=Pango.EllipsizeMode.END,
@@ -225,7 +227,7 @@ class SendPage(Gtk.Box):
         self.send_cancel_btn = Gtk.Button(label=_("Cancel"))
         self.send_cancel_btn.add_css_class("destructive-action")
         self.send_cancel_btn.connect("clicked", lambda *_: self.emit("cancel-send"))
-        transfer_row.append(self.send_status_stack)
+        transfer_row.append(self.send_status_box)
         transfer_row.append(self.send_transfer_label)
         transfer_row.append(self.send_cancel_btn)
         self.send_transfer_box.append(transfer_row)
@@ -302,13 +304,6 @@ class SendPage(Gtk.Box):
         scroll.set_child(outer)
         self.append(scroll)
 
-    def _make_sent_icon(self, *, size: int = 16) -> Gtk.Image:
-        """Green sent indicator (emblem-ok; symbolic variant is missing in GNOME)."""
-        icon = Gtk.Image.new_from_icon_name("emblem-ok")
-        icon.set_pixel_size(size)
-        icon.set_valign(Gtk.Align.CENTER)
-        return icon
-
     def _on_drop(
         self, drop_target: Gtk.DropTarget, value: Any, _x: float, _y: float
     ) -> bool:
@@ -354,7 +349,8 @@ class SendPage(Gtk.Box):
                 self.excluded_items,
                 self.send_text,
             )
-            self.send_status_stack.set_visible_child_name("spinner")
+            self.send_success_icon.set_visible(False)
+            self.send_spinner.set_visible(True)
             self.send_spinner.start()
             self.send_cancel_btn.set_visible(True)
             if label:
@@ -369,11 +365,13 @@ class SendPage(Gtk.Box):
         self.send_spinner.stop()
         self.send_cancel_btn.set_visible(False)
         if canceled:
-            self.send_status_stack.set_visible_child_name("spinner")
+            self.send_success_icon.set_visible(False)
+            self.send_spinner.set_visible(True)
             self.send_transfer_label.set_label(_("Transfer cancelled"))
             self.send_progress.set_visible(False)
         else:
-            self.send_status_stack.set_visible_child_name("success")
+            self.send_spinner.set_visible(False)
+            self.send_success_icon.set_visible(True)
             self.send_transfer_label.set_label(_("Transfer finished"))
             self.send_progress.set_fraction(1.0)
             self.send_progress.set_text(_("Done"))
@@ -440,7 +438,7 @@ class SendPage(Gtk.Box):
                 subtitle=_("Sent successfully") if sent else path,
             )
             if sent:
-                row.add_prefix(self._make_sent_icon())
+                row.add_prefix(make_success_icon(self))
                 row.add_css_class("success")
             else:
                 row.add_prefix(Gtk.Image.new_from_icon_name("list-add-symbolic"))
@@ -469,7 +467,7 @@ class SendPage(Gtk.Box):
             )
             row = Adw.ActionRow(title=_("Text"), subtitle=subtitle)
             if self._text_sent:
-                row.add_prefix(self._make_sent_icon())
+                row.add_prefix(make_success_icon(self))
                 row.add_css_class("success")
             else:
                 row.add_prefix(

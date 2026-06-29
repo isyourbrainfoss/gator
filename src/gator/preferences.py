@@ -41,14 +41,71 @@ class PreferencesDialog:
         self._on_change_default_folder = on_change_default_folder
         self._on_reset = on_reset
         self.default_folder_row: Adw.ActionRow | None = None
+        self._entry_rows: list[Adw.EntryRow | Adw.PasswordEntryRow] = []
 
     def present(self, parent: Gtk.Window) -> None:
+        self._entry_rows = []
         dlg = Adw.PreferencesDialog()
         dlg.set_title(_("Preferences"))
         page = Adw.PreferencesPage()
         self._fill_page(page, dlg)
         dlg.add(page)
+        scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll.connect("scroll", self._on_prefs_scroll)
+        dlg.add_controller(scroll)
         dlg.present(parent)
+
+    def _on_prefs_scroll(
+        self,
+        controller: Gtk.EventControllerScroll,
+        _dx: float,
+        dy: float,
+    ) -> bool:
+        if abs(dy) < 0.5:
+            return False
+        widget = controller.get_widget()
+        self._release_entry_focus(widget)
+        return False
+
+    def _release_entry_focus(self, widget: Gtk.Widget) -> None:
+        for row in self._entry_rows:
+            row.set_editable(False)
+        root = widget.get_root()
+        if isinstance(root, Gtk.Window):
+            root.set_focus(None)
+
+    def _configure_text_row(self, row: Adw.EntryRow | Adw.PasswordEntryRow) -> None:
+        """Touch-friendly: edit on double-tap; scroll won't pop the keyboard."""
+        row.set_editable(False)
+        if hasattr(row, "set_show_apply_button"):
+            row.set_show_apply_button(True)
+        self._entry_rows.append(row)
+
+        def on_pressed(
+            _gesture: Gtk.GestureClick, n_press: int, _x: float, _y: float
+        ) -> None:
+            if n_press >= 2:
+                row.set_editable(True)
+                row.grab_focus()
+
+        gesture = Gtk.GestureClick()
+        gesture.set_button(0)
+        gesture.connect("pressed", on_pressed)
+        row.add_controller(gesture)
+
+        def on_apply(_row: Adw.EntryRow | Adw.PasswordEntryRow) -> None:
+            _row.set_editable(False)
+            self._release_entry_focus(_row)
+
+        if hasattr(row, "connect"):
+            try:
+                row.connect("apply", on_apply)
+            except TypeError:
+                pass
+
+        focus_ctl = Gtk.EventControllerFocus()
+        focus_ctl.connect("leave", lambda *_: row.set_editable(False))
+        row.add_controller(focus_ctl)
 
     def update_save_dir_subtitle(self, path: str) -> None:
         self.save_dir = path
@@ -79,6 +136,7 @@ class PreferencesDialog:
             lambda e: self.settings.update({key: e.get_text().strip()})
             or self.settings.save(),  # type: ignore[func-returns-value]
         )
+        self._configure_text_row(row)
         return row
 
     def _on_color_scheme_radio_toggled(
@@ -222,6 +280,7 @@ class PreferencesDialog:
             lambda e: self.settings.update({"pass": e.get_text().strip()})
             or self.settings.save(),  # type: ignore[func-returns-value]
         )
+        self._configure_text_row(pass_row)
         relay_proxy.add(pass_row)
         relay_proxy.add(self._make_entry_row("socks5", _("SOCKS5 proxy")))
         relay_proxy.add(self._make_entry_row("connect", _("HTTP proxy")))

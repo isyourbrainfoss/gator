@@ -83,7 +83,6 @@ def make_success_icon(widget: Gtk.Widget, *, size: int = 16) -> Gtk.Image:
 
 
 def qr_colors_for_widget(widget: Gtk.Widget) -> tuple[str, str]:
-    """Return (foreground, background) hex colors for QR generation."""
-    fg = rgba_to_hex(get_theme_rgba(widget, "window_fg_color"))
-    bg = rgba_to_hex(get_theme_rgba(widget, "window_bg_color"))
-    return fg, bg
+    """Return (foreground, background) hex for QR — always dark-on-light for cameras."""
+    _ = widget  # kept for call-site consistency / future theming hooks
+    return "#000000", "#ffffff"

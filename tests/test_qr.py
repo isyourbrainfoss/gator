@@ -29,3 +29,22 @@ def test_scan_graceful(tmp_path):
     # Should not raise
     res = scan_qr_from_image_path(str(p))
     assert res is None or isinstance(res, str)
+
+
+def test_qr_roundtrip_black_on_white(tmp_path):
+    if not HAS_QR_GEN or not HAS_QR_SCAN:
+        return
+    import qrcode
+    from PIL import ImageOps
+
+    code = "1234-lion-stop-sofia"
+    img = qrcode.make(code, error_correction=qrcode.constants.ERROR_CORRECT_H)
+    path = tmp_path / "qr.png"
+    img.save(path)
+    assert scan_qr_from_image_path(str(path)) == code
+
+    # Inverted (light-on-dark) photos should still decode
+    inverted = ImageOps.invert(img.convert("L")).convert("RGB")
+    inv_path = tmp_path / "qr-inverted.png"
+    inverted.save(inv_path)
+    assert scan_qr_from_image_path(str(inv_path)) == code

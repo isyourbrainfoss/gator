@@ -32,6 +32,7 @@ class ReceivePage(Gtk.Box):
         "paste-clipboard": (GObject.SignalFlags.RUN_LAST, None, ()),
         "scan-qr": (GObject.SignalFlags.RUN_LAST, None, ()),
         "change-folder": (GObject.SignalFlags.RUN_LAST, None, ()),
+        "open-received-folder": (GObject.SignalFlags.RUN_LAST, None, ()),
         "qr-dropped": (GObject.SignalFlags.RUN_LAST, bool, (object,)),
     }
 
@@ -86,11 +87,22 @@ class ReceivePage(Gtk.Box):
         )
         self.folder_icon = Gtk.Image.new_from_icon_name("folder-symbolic")
         self.folder_row.add_prefix(self.folder_icon)
+        folder_actions = Gtk.Box(spacing=6)
+        self.open_folder_btn = Gtk.Button(icon_name="folder-open-symbolic")
+        self.open_folder_btn.add_css_class("suggested-action")
+        self.open_folder_btn.set_tooltip_text(_("Open received folder"))
+        set_a11y_label(self.open_folder_btn, _("Open received folder"))
+        self.open_folder_btn.set_visible(False)
+        self.open_folder_btn.connect(
+            "clicked", lambda *_: self.emit("open-received-folder")
+        )
         change_btn = Gtk.Button(icon_name="document-open-symbolic")
-        change_btn.set_tooltip_text(_("Change folder"))
-        set_a11y_label(change_btn, _("Change folder"))
+        change_btn.set_tooltip_text(_("Change save folder"))
+        set_a11y_label(change_btn, _("Change save folder"))
         change_btn.connect("clicked", lambda *_: self.emit("change-folder"))
-        self.folder_row.add_suffix(change_btn)
+        folder_actions.append(self.open_folder_btn)
+        folder_actions.append(change_btn)
+        self.folder_row.add_suffix(folder_actions)
         form.append(self.folder_row)
 
         controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -256,14 +268,17 @@ class ReceivePage(Gtk.Box):
             self.receive_progress.set_visible(True)
 
     def _update_folder_row_success(self) -> None:
+        self.folder_row.set_subtitle(self._save_dir)
         if self._receive_success:
+            self.folder_row.set_title(_("Received successfully"))
             self.folder_icon.set_from_icon_name(resolve_success_icon_name(self))
-            self.folder_row.set_subtitle(_("Received successfully"))
             self.folder_row.add_css_class("success")
+            self.open_folder_btn.set_visible(True)
         else:
+            self.folder_row.set_title(_("Save to folder"))
             self.folder_icon.set_from_icon_name("folder-symbolic")
-            self.folder_row.set_subtitle(self._save_dir)
             self.folder_row.remove_css_class("success")
+            self.open_folder_btn.set_visible(False)
 
     def set_progress(self, fraction: float) -> None:
         self.receive_progress.set_fraction(fraction)

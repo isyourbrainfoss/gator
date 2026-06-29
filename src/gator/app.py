@@ -123,6 +123,7 @@ class GatorApp(Adw.Application):
         p.connect("paste-clipboard", self._on_paste_clipboard)
         p.connect("scan-qr", self._on_scan_qr_image)
         p.connect("change-folder", self._on_change_folder)
+        p.connect("open-received-folder", self._on_open_received_folder)
         p.connect("qr-dropped", self._on_receive_qr_drop)
 
     def add_toast(self, title: str) -> None:
@@ -369,6 +370,17 @@ class GatorApp(Adw.Application):
         if self._receive_transfer is not None:
             self._receive_transfer.cancel()
 
+    def _open_receive_folder(self) -> None:
+        try:
+            uri = Path(self.receive_page.get_save_dir()).resolve().as_uri()
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+        except Exception as e:
+            logger.warning("Failed to open save folder: %s", e)
+            self.add_toast(_("Failed to open folder"))
+
+    def _on_open_received_folder(self, _page) -> None:
+        self._open_receive_folder()
+
     def _show_transfer_complete_popup(self) -> None:
         dialog = Adw.AlertDialog(
             heading=_("Transfer Complete"),
@@ -380,12 +392,7 @@ class GatorApp(Adw.Application):
 
         def on_response(_d, response: str) -> None:
             if response == "open":
-                try:
-                    uri = Path(self.receive_page.get_save_dir()).resolve().as_uri()
-                    Gio.AppInfo.launch_default_for_uri(uri, None)
-                except Exception as e:
-                    logger.warning("Failed to open save folder: %s", e)
-                    self.add_toast(_("Failed to open folder"))
+                self._open_receive_folder()
 
         dialog.connect("response", on_response)
         dialog.present(self.win)

@@ -10,9 +10,9 @@ from gator.transfer import (
     build_global_args,
     build_receive_args,
     detect_transfer_phase,
+    is_croc_status_line,
     normalize_croc_code,
     parse_progress_fraction,
-    is_croc_status_line,
     receive_env_for_code,
     split_croc_output,
 )

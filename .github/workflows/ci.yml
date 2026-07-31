@@ -12,6 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            gcc \
+            python3-dev \
+            libcairo2-dev \
+            libgirepository1.0-dev \
+            libglib2.0-dev \
+            libffi-dev \
+            libzbar0 \
+            libzbar-dev
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

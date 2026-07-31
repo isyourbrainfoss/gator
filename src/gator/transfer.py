@@ -224,7 +224,8 @@ class CrocTransfer:
         except GLib.Error as e:
             logger.exception("Failed to start croc")
             self._on_log(f"Error starting croc: {e.message}")
-            self._on_finished()
+            # Route through _cleanup so _finished is set and cancel() is a no-op.
+            self._cleanup()
 
     def cancel(self) -> None:
         """Terminate the running subprocess."""
@@ -484,7 +485,7 @@ class CrocReceiveTransfer(CrocTransfer):
         self._code = code
         if not code:
             self._on_log("Error: no transfer code")
-            self._on_finished()
+            self._cleanup()
             return
         args = build_receive_args(self._settings)
         display = [f'"{a}"' if " " in a else a for a in args]

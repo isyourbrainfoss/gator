@@ -18,18 +18,31 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pkg-config \
             gcc \
+            cmake \
+            ninja-build \
             python3-dev \
             libcairo2-dev \
             libgirepository1.0-dev \
+            libgirepository-2.0-dev \
             libglib2.0-dev \
             libffi-dev \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1 \
             libzbar0 \
             libzbar-dev
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - name: Install croc
+        run: |
+          curl -fsSL \
+            "https://github.com/schollz/croc/releases/download/v10.7.0/croc_v10.7.0_Linux-64bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin croc
+          croc --version
 
       - name: Install dependencies
         run: |

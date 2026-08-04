@@ -10,9 +10,11 @@
 name: Publish Flatpak
 
 on:
+  # Deploy only from branch pushes (not tags). The github-pages environment
+  # blocks tag refs, which turned v* releases into a red Publish Flatpak failure
+  # even though master already built and published the same commit.
   push:
     branches: [main, master]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

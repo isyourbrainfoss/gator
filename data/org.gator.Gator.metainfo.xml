@@ -57,6 +57,16 @@
   <content_rating type="oars-1.1" />
   
   <releases>
+    <release version="1.5.1" date="2026-08-04">
+      <description>
+        <p>Bundled croc update and icon:</p>
+        <ul>
+          <li>Update bundled croc from 10.4.4 to 11.0.1 (PAKE protocol v2, new default relays at getcroc.com, security hardening)</li>
+          <li>Ship the new Gator app icon</li>
+          <li>CI reliability fixes for PyGObject/GTK test environment</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5" date="2026-06-25">
       <description>
         <p>Transfer reliability and UI polish:</p>

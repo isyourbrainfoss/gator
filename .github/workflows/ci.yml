@@ -40,7 +40,7 @@ jobs:
       - name: Install croc
         run: |
           curl -fsSL \
-            "https://github.com/schollz/croc/releases/download/v10.7.0/croc_v10.7.0_Linux-64bit.tar.gz" \
+            "https://github.com/schollz/croc/releases/download/v11.0.1/croc_v11.0.1_Linux-64bit.tar.gz" \
             | sudo tar -xz -C /usr/local/bin croc
           croc --version
 

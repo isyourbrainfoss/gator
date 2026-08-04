@@ -12,7 +12,7 @@ Core app, Flatpak, and CI are done. **You:** proper app icon + real screenshots.
 - Modular GTK4/libadwaita app (`app`, `window`, pages, `transfer`, `settings`, `preferences`)
 - `Gio.Subprocess` transfers with `\r`/`\n` progress parsing
 - GSettings + JSON fallback; empty croc defaults + legacy relay migration
-- Flatpak bundles croc v10.4.4; GitHub Pages repo (x86_64 + aarch64)
+- Flatpak bundles croc v11.0.1; GitHub Pages repo (x86_64 + aarch64)
 - Meson, desktop, metainfo, CI (black/ruff/mypy/pytest)
 - Unit tests: settings, transfer, qr, theme
 

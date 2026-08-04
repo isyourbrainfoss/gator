@@ -49,8 +49,8 @@ modules:
         go build -o $FLATPAK_DEST/bin/croc .
     sources:
       - type: archive
-        url: https://github.com/schollz/croc/archive/refs/tags/v10.4.4.tar.gz
-        sha256: 33e9160829705942178a017ce055196c4a66c9ef5cdfe8029e840be835e756d4
+        url: https://github.com/schollz/croc/archive/refs/tags/v11.0.1.tar.gz
+        sha256: 44152e31cf651a9ac2b0492573f562a2784fcf75afa7ff5a9ce815f7ec5352d0
         strip-components: 1
 
   - name: zbar

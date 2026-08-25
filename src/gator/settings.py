@@ -1,24 +1,18 @@
 """settings.py – Centralised configuration loading, saving, and defaults.
 
-Currently uses a JSON file in the user config dir as the backing store.
-This is a non-Flatpak-friendly approach (direct FS writes).
+Prefers GSettings (org.gator.Gator) when the schema is installed (Flatpak /
+prefix installs) and falls back to JSON in the user config dir for
+dev/pip runs.
 
-For Flatpak / GSettings migration (see TASKS.md):
-  - Add a GSettings XML schema (org.gator.Gator.gschema.xml)
-  - Install via Meson + glib-compile-schemas
-  - Replace dict access with a Gio.Settings-backed object or adapter
-  - Keep this module's JSON path as a fallback when GSettings is unavailable
-    (e.g. outside Flatpak or dev runs).
-
-All call sites should go through load_settings() / save_settings() and
-the DEFAULTS mapping so that adding new keys or changing defaults has
-one place to update.
+All call sites should go through GatorSettings and the DEFAULTS mapping
+so that adding new keys or changing defaults has one place to update.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ── Application constants (source of truth) ──────────────────────────────────
 APP_ID = "org.gator.Gator"
 APP_NAME = "Gator"
-APP_VERSION = "1.5"
+APP_VERSION = "1.6.0"
 
 CROC_BINARY = "croc"
 
@@ -66,8 +60,9 @@ DEFAULTS: dict[str, Any] = {
     "color_scheme": "default",
     # Receiving
     "save_dir": None,  # resolved at runtime to XDG_DOWNLOAD or $HOME
-    "yes": True,  # GUI has no terminal prompt; disable in prefs to review each transfer
+    "yes": True,  # GUI always passes --yes (no TTY prompts)
     "overwrite": False,
+    "rename": False,
     # General
     "debug": False,
     "no_compress": False,
@@ -165,7 +160,7 @@ def validate_settings(settings: dict[str, Any]) -> dict[str, Any]:
     s["multicast"] = (s.get("multicast") or "").strip()
     # Hash: empty = croc default; otherwise whitelist
     h = (s.get("hash") or "").strip()
-    if h and h not in ("xxhash", "imohash", "md5"):
+    if h and h not in ("xxhash", "imohash", "md5", "highway"):
         s["hash"] = DEFAULT_HASH
     else:
         s["hash"] = h
@@ -335,7 +330,17 @@ class GatorSettings(dict):
             try:
                 # Only persist keys that differ from defaults or are user set
                 to_save = {k: v for k, v in self.items() if v != DEFAULTS.get(k)}
-                with open(self._json_file, "w") as f:
+                self._json_file.parent.mkdir(parents=True, exist_ok=True)
+                fd = os.open(
+                    self._json_file,
+                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                    0o600,
+                )
+                try:
+                    os.fchmod(fd, 0o600)
+                except OSError:
+                    pass
+                with os.fdopen(fd, "w") as f:
                     json.dump(to_save, f, indent=2)
             except OSError as e:
                 logger.error("Could not save JSON settings: %s", e)

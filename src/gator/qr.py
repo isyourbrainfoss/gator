@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -53,10 +52,6 @@ def generate_qr_texture(
         return None
 
 
-_lib_path = os.environ.get("LD_LIBRARY_PATH", "")
-if "/app/lib" not in _lib_path:
-    os.environ["LD_LIBRARY_PATH"] = "/app/lib:" + _lib_path
-
 try:
     from pyzbar.pyzbar import decode  # type: ignore
 
@@ -64,6 +59,15 @@ try:
 except Exception:
     HAS_QR_SCAN = False
     decode = None  # type: ignore
+
+# Scan needs both pyzbar and Pillow (variants / Image.open).
+if HAS_QR_SCAN and PILImage is None:
+    HAS_QR_SCAN = False
+
+QR_SCAN_HINT = (
+    "QR scanning needs pyzbar, Pillow, and libzbar. "
+    "Install gator[qr] and your distro's zbar package."
+)
 
 
 def _decode_first(image: Any) -> str | None:

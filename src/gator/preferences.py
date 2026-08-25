@@ -68,33 +68,19 @@ class PreferencesDialog:
         return False
 
     def _release_entry_focus(self, widget: Gtk.Widget) -> None:
-        for row in self._entry_rows:
-            row.set_editable(False)
         root = widget.get_root()
         if isinstance(root, Gtk.Window):
             root.set_focus(None)
 
     def _configure_text_row(self, row: Adw.EntryRow | Adw.PasswordEntryRow) -> None:
-        """Touch-friendly: edit on double-tap; scroll won't pop the keyboard."""
-        row.set_editable(False)
+        """Keep apply-to-commit; rows stay editable for keyboard and pointer."""
+        row.set_editable(True)
         if hasattr(row, "set_show_apply_button"):
             row.set_show_apply_button(True)
         self._entry_rows.append(row)
 
-        def on_pressed(
-            _gesture: Gtk.GestureClick, n_press: int, _x: float, _y: float
-        ) -> None:
-            if n_press >= 2:
-                row.set_editable(True)
-                row.grab_focus()
-
-        gesture = Gtk.GestureClick()
-        gesture.set_button(0)
-        gesture.connect("pressed", on_pressed)
-        row.add_controller(gesture)
-
         def on_apply(_row: Adw.EntryRow | Adw.PasswordEntryRow) -> None:
-            _row.set_editable(False)
+            _row.set_editable(True)
             self._release_entry_focus(_row)
 
         if hasattr(row, "connect"):
@@ -102,10 +88,6 @@ class PreferencesDialog:
                 row.connect("apply", on_apply)
             except TypeError:
                 pass
-
-        focus_ctl = Gtk.EventControllerFocus()
-        focus_ctl.connect("leave", lambda *_: row.set_editable(False))
-        row.add_controller(focus_ctl)
 
     def update_save_dir_subtitle(self, path: str) -> None:
         self.save_dir = path
@@ -131,11 +113,13 @@ class PreferencesDialog:
         row.set_text(self.settings.get(key, ""))
         if tooltip:
             row.set_tooltip_text(tooltip)
-        row.connect(
-            "changed",
-            lambda e: self.settings.update({key: e.get_text().strip()})
-            or self.settings.save(),  # type: ignore[func-returns-value]
-        )
+
+        def persist(entry: Adw.EntryRow) -> None:
+            self.settings.update({key: entry.get_text().strip()})
+            self.settings.save()
+
+        row.connect("apply", persist)
+        row.connect("changed", persist)
         self._configure_text_row(row)
         return row
 
@@ -204,24 +188,37 @@ class PreferencesDialog:
         self.default_folder_row.add_prefix(
             Gtk.Image.new_from_icon_name("folder-symbolic")
         )
+        self.default_folder_row.set_activatable(True)
+        self.default_folder_row.connect(
+            "activated", lambda *_: self._on_change_default_folder()
+        )
         folder_btn = Gtk.Button(icon_name="document-open-symbolic")
+        folder_btn.add_css_class("flat")
+        folder_btn.add_css_class("circular")
         folder_btn.set_tooltip_text(_("Change folder"))
         set_a11y_label(folder_btn, _("Change folder"))
         folder_btn.connect("clicked", lambda *_: self._on_change_default_folder())
         self.default_folder_row.add_suffix(folder_btn)
         receiving.add(self.default_folder_row)
+        auto_row = Adw.ActionRow(
+            title=_("Incoming transfers"),
+            subtitle=_(
+                "Gator always accepts incoming files (there is no terminal prompt)."
+            ),
+        )
+        receiving.add(auto_row)
         receiving.add(
             self._make_switch_row(
-                "yes",
-                _("Automatically accept incoming transfers"),
-                subtitle=_("Passes --yes to croc; skips all confirmation prompts"),
+                "overwrite",
+                _("Overwrite existing files"),
+                subtitle=_("Replace files that already exist in the save folder"),
             )
         )
         receiving.add(
             self._make_switch_row(
-                "overwrite",
-                _("Overwrite existing files without prompt"),
-                subtitle=_("Passes --overwrite to croc"),
+                "rename",
+                _("Rename if a file already exists"),
+                subtitle=_("Keep both copies instead of replacing"),
             )
         )
         page.add(receiving)
@@ -294,7 +291,7 @@ class PreferencesDialog:
                 tooltip=_("Optional – leave empty for a random code"),
             )
         )
-        hash_options = [_("Default (croc)"), "imohash", "md5"]
+        hash_options = [_("Default (croc)"), "imohash", "md5", "highway"]
         hash_row = Adw.ComboRow(title=_("Hash algorithm"))
         hash_row.set_model(Gtk.StringList.new(hash_options))
         current_hash = (self.settings.get("hash") or "").strip()
@@ -348,23 +345,32 @@ class PreferencesDialog:
             or self.settings.save(),  # type: ignore[func-returns-value]
         )
         sending.add(transfers_row)
-        sending.add(
-            self._make_switch_row(
-                "qr",
-                _("Show receive code as QR"),
-                subtitle=_("Shows QR code in shell output"),
-            )
-        )
         page.add(sending)
 
         reset_group = Adw.PreferencesGroup(title=_("Reset"))
         reset_row = Adw.ActionRow(title=_("Reset all settings to default"))
         reset_btn = Gtk.Button(label=_("Reset"))
         reset_btn.add_css_class("destructive-action")
-        reset_btn.connect(
-            "clicked",
-            lambda *_: (self._on_reset(), dlg.close()),
-        )
+        reset_btn.connect("clicked", lambda *_: self._confirm_reset(dlg))
         reset_row.add_suffix(reset_btn)
         reset_group.add(reset_row)
         page.add(reset_group)
+
+    def _confirm_reset(self, dlg: Adw.PreferencesDialog) -> None:
+        confirm = Adw.AlertDialog(
+            heading=_("Reset all settings?"),
+            body=_("This restores Gator’s default preferences."),
+        )
+        confirm.add_response("cancel", _("Cancel"))
+        confirm.add_response("reset", _("Reset"))
+        confirm.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
+        confirm.set_default_response("cancel")
+        confirm.set_close_response("cancel")
+
+        def on_response(_d: Adw.AlertDialog, response: str) -> None:
+            if response == "reset":
+                self._on_reset()
+                dlg.close()
+
+        confirm.connect("response", on_response)
+        confirm.present(dlg)

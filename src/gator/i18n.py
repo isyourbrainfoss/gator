@@ -14,6 +14,11 @@ LOCALEDIR = os.environ.get(
 )
 
 try:
+    locale.setlocale(locale.LC_ALL, "")
+except locale.Error:
+    pass
+
+try:
     locale.bindtextdomain(DOMAIN, LOCALEDIR)
     locale.textdomain(DOMAIN)
     gettext.bindtextdomain(DOMAIN, LOCALEDIR)

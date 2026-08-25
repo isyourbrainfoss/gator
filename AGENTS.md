@@ -33,8 +33,8 @@ gator
 ## Architecture
 
 - **Modular source**: `src/gator/` contains the GTK application (split from the original single-file prototype)
-- **Extracted module**: `transfer.py` handles subprocess/threading for croc binary
-- **External dependency**: Requires `croc` binary in PATH for actual file transfers
+- **Extracted module**: `transfer.py` wraps `croc` with `Gio.Subprocess` async I/O on the GLib main loop (no worker threads)
+- **External dependency**: Requires `croc` binary in PATH for pip/source runs; Flatpak bundles croc
 - **Optional QR support**: Install with `[qr]` extra for QR code generation/scanning
 
 ## Key Dependencies
@@ -47,24 +47,22 @@ gator
 
 1. **Code style**: Black (88 chars) → Ruff linting → MyPy type checking
 2. **No git hooks**: Run quality checks manually before commits
-3. **Thread safety**: All subprocess I/O uses daemon threads with `GLib.idle_add` for UI updates
+3. **Main-loop I/O**: croc runs as `Gio.Subprocess`; drain stdout asynchronously on the GLib main loop (no daemon worker threads)
 
 ## Critical Notes
 
-- **Libadwaita version compatibility**: Code includes fallbacks for older libadwaita versions (`Adw.AboutDialog` vs `Adw.AboutWindow`, `Adw.PreferencesDialog` availability); recommended runtime is GNOME 50 (libadwaita 1.7+)
-- **Thread-safe subprocess**: Never access `send_proc`/`receive_proc` without proper locking
+- **Libadwaita version compatibility**: Prefer `Adw.AboutDialog` / `Adw.PreferencesDialog` with fallbacks where the API is missing; recommended runtime is GNOME 50 (libadwaita 1.7+)
+- **Subprocess lifecycle**: Cancel with `CrocTransfer.cancel()`; always finish outstanding Gio async reads; treat `wait_finish` as a boolean, not an exit code (`get_exit_status` / `get_successful`)
 - **Settings format**: GSettings in Flatpak (`org.gator.Gator.gschema.xml`); JSON fallback in `~/.config/gator/` for dev/pip runs
 - **QR dependencies are optional**: Application degrades gracefully without PIL/pyzbar
+- **UNIX custom send codes**: Pass the phrase in `CROC_SECRET`, never `--code` (croc v10+ exits on UNIX if `--code` is set without the env var)
 
 ## Current Status
 
-See `TASKS.md` for detailed roadmap. **~96% complete** toward production readiness:
-- ✅ All P0/P1 bugs fixed; Gio.Subprocess transfers with progress bars
-- ✅ GSettings + Flatpak packaging (bundled croc); GitHub Pages install repo
-- 🔄 Optional: Flathub submission, transfer history, real screenshots in metainfo
+See `TASKS.md` for the roadmap. Core app, Flatpak, and transfer reliability (honest success/fail, croc 11.3.2) are in tree. Optional later: Flathub, transfer history, real screenshots.
 
 ## Testing Strategy
 
-- **Unit tests**: Planned for `transfer.py` and future `settings.py` (no GTK dependencies)
+- **Unit tests**: `tests/test_transfer.py`, `test_settings.py`, `test_qr.py`, `test_theme.py` (no GTK widgets except Gio subprocess in the cancel test)
 - **Manual testing**: Test on GNOME 50 (freshest) and older with fallbacks, test QR optional dependencies, verify Flatpak build with current runtime
 - **Integration**: Test croc binary integration with various file types and sizes

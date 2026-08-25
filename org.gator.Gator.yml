@@ -61,8 +61,8 @@ modules:
         go build -o $FLATPAK_DEST/bin/croc .
     sources:
       - type: archive
-        url: https://github.com/schollz/croc/archive/refs/tags/v11.0.1.tar.gz
-        sha256: 44152e31cf651a9ac2b0492573f562a2784fcf75afa7ff5a9ce815f7ec5352d0
+        url: https://github.com/schollz/croc/archive/refs/tags/v11.3.2.tar.gz
+        sha256: 441f751cc45d0a66312a54bf5374a6f30e95992e0d71c808d5aaadb62f74cd67
         strip-components: 1
 
   # --- zbar (for pyzbar QR scanning on receive) -----------------------------
@@ -105,6 +105,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/isyourbrainfoss/gator.git
+        # Last tagged Gator release. CI/GitHub Pages build devel.yml (this tree).
+        # Bump this tag when cutting a v1.6.0 GitHub/Flathub-style release.
         tag: v1.5.1
     post-install:
       # Ensure the entry point is executable

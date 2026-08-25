@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 import gi
@@ -13,10 +14,13 @@ from gi.repository import Adw, Gtk
 from .a11y import set_a11y_label
 from .i18n import _
 
+logger = logging.getLogger(__name__)
+
 
 def show_add_text_dialog(
     parent: Gtk.Window,
     on_accept: Callable[[str], None],
+    initial: str = "",
 ) -> None:
     """Modal editor for text to send via croc --text."""
     text_win = Adw.Window(transient_for=parent, modal=True)
@@ -27,13 +31,18 @@ def show_add_text_dialog(
     header = Adw.HeaderBar()
     toolbar.add_top_bar(header)
 
+    cancel_btn = Gtk.Button(label=_("Cancel"))
+    cancel_btn.connect("clicked", lambda *_: text_win.close())
+    header.pack_start(cancel_btn)
+
     paste_btn = Gtk.Button(icon_name="edit-paste-symbolic")
     paste_btn.set_tooltip_text(_("Paste from clipboard"))
     set_a11y_label(paste_btn, _("Paste from clipboard"))
     header.pack_end(paste_btn)
 
-    ok_btn = Gtk.Button(label=_("OK"))
+    ok_btn = Gtk.Button(label=_("Add"))
     ok_btn.add_css_class("suggested-action")
+    ok_btn.set_sensitive(bool(initial.strip()))
     header.pack_end(ok_btn)
 
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -45,8 +54,21 @@ def show_add_text_dialog(
 
     scroll = Gtk.ScrolledWindow(vexpand=True)
     text_view = Gtk.TextView(monospace=True, wrap_mode=Gtk.WrapMode.WORD_CHAR)
+    set_a11y_label(text_view, _("Text to send"))
+    if initial:
+        text_view.get_buffer().set_text(initial)
     scroll.set_child(text_view)
     box.append(scroll)
+
+    def _buffer_nonempty() -> bool:
+        buf = text_view.get_buffer()
+        start, end = buf.get_bounds()
+        return bool(buf.get_text(start, end, False).strip())
+
+    def on_buffer_changed(_buf: Gtk.TextBuffer) -> None:
+        ok_btn.set_sensitive(_buffer_nonempty())
+
+    text_view.get_buffer().connect("changed", on_buffer_changed)
 
     def paste_from_clipboard(_btn: Gtk.Button) -> None:
         clipboard = parent.get_clipboard()
@@ -57,13 +79,15 @@ def show_add_text_dialog(
                 if text:
                     text_view.get_buffer().set_text(text)
             except Exception:
-                pass
+                logger.warning("Clipboard paste failed", exc_info=True)
 
         clipboard.read_text_async(None, cb)
 
     paste_btn.connect("clicked", paste_from_clipboard)
 
     def accept(_btn: Gtk.Button) -> None:
+        if not _buffer_nonempty():
+            return
         buf = text_view.get_buffer()
         start, end = buf.get_bounds()
         on_accept(buf.get_text(start, end, False))

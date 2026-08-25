@@ -86,3 +86,32 @@ def qr_colors_for_widget(widget: Gtk.Widget) -> tuple[str, str]:
     """Return (foreground, background) hex for QR — always dark-on-light for cameras."""
     _ = widget  # kept for call-site consistency / future theming hooks
     return "#000000", "#ffffff"
+
+
+_APP_CSS = b"""
+.gator-drop {
+  outline: 2px dashed alpha(@accent_color, 0.7);
+  outline-offset: -4px;
+}
+.qr-code {
+  padding: 12px;
+  background-color: #ffffff;
+  border-radius: 12px;
+}
+"""
+
+
+def load_app_css() -> None:
+    """Install application CSS (drop highlight, QR quiet zone)."""
+    from gi.repository import Gdk, Gtk
+
+    display = Gdk.Display.get_default()
+    if display is None:
+        return
+    provider = Gtk.CssProvider()
+    provider.load_from_data(_APP_CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        display,
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )

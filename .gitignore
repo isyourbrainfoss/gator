@@ -135,6 +135,10 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# croc leftovers from live send tests / GUI cwd
+croc-stdin-*
+croc-marked-files.txt
+
 # Project specific
 *.swp
 *~

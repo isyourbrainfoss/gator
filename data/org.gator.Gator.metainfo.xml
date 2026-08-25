@@ -51,12 +51,29 @@
   <url type="bugtracker">https://github.com/isyourbrainfoss/gator/issues</url>
   <url type="vcs-browser">https://github.com/isyourbrainfoss/gator</url>
 
-  <developer_name>Gator Contributors</developer_name>
+  <developer id="org.gator.Gator">
+    <name>Gator Contributors</name>
+  </developer>
   <update_contact>https://github.com/isyourbrainfoss/gator/issues</update_contact>
-  
+  <categories>
+    <category>Network</category>
+    <category>FileTransfer</category>
+  </categories>
   <content_rating type="oars-1.1" />
   
   <releases>
+    <release version="1.6.0" date="2026-08-25">
+      <description>
+        <p>Reliability, croc 11.3.2, and clearer transfer results:</p>
+        <ul>
+          <li>Failed transfers no longer look successful; errors show a banner and the real reason</li>
+          <li>Custom send codes use CROC_SECRET so they work on Linux</li>
+          <li>Bundled croc updated from 11.0.1 to 11.3.2 (faster default paths, public relay pool)</li>
+          <li>Secrets redacted from the shell log; croc temp files isolated</li>
+          <li>Confirm before quitting during a transfer; freeze the file list while sending</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.1" date="2026-08-04">
       <description>
         <p>Bundled croc update and icon:</p>

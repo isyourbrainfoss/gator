@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import pytest
+
 from gator.qr import (
     HAS_QR_GEN,
     HAS_QR_SCAN,
@@ -33,7 +35,7 @@ def test_scan_graceful(tmp_path):
 
 def test_qr_roundtrip_black_on_white(tmp_path):
     if not HAS_QR_GEN or not HAS_QR_SCAN:
-        return
+        pytest.skip("QR extras not installed")
     import qrcode
     from PIL import ImageOps
 

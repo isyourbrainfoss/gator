@@ -1,6 +1,6 @@
 project(
   'gator',
-  version: '1.5.1',
+  version: '1.6.0',
   license: 'GPL-3.0-or-later',
   meson_version: '>= 1.0.0',
 )
@@ -21,6 +21,7 @@ conf = configuration_data()
 conf.set('PYTHON', python.full_path())
 conf.set('PKGDATADIR', pkgdatadir)
 conf.set('APPID', 'org.gator.Gator')
+conf.set('localedir', join_paths(get_option('prefix'), get_option('localedir')))
 
 configure_file(
   input: 'data/gator.in',

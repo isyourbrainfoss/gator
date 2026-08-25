@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gator"
-version = "1.5.1"
+version = "1.6.0"
 description = "Modern GTK4/Libadwaita frontend for croc secure file transfers"
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -29,9 +29,6 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "PyGObject >= 3.42",
-    # Optional QR code support
-    "qrcode[pil] >= 7.0; extra == 'qr'",
-    "pyzbar >= 0.1.9; extra == 'qr'",
 ]
 
 [project.optional-dependencies]

@@ -50,17 +50,20 @@ class GatorWindow(Adw.ApplicationWindow):
         toast.set_timeout(3)
         self.toast_overlay.add_toast(toast)
 
-    def show_croc_missing(self) -> None:
+    def show_croc_missing(self, on_retry: Callable[[], None] | None = None) -> None:
         page = Adw.StatusPage()
         page.set_title(_("croc not found"))
         page.set_description(
             _(
-                "The <b>croc</b> command-line tool is required to use this app.\n"
-                "Please install it first."
+                "Gator needs the croc tool to send and receive files. "
+                "Install croc from your package manager, or use the Flatpak "
+                "build which already includes it."
             )
         )
         page.set_icon_name("dialog-error-symbolic")
-        btn = Gtk.Button(label=_("Open croc GitHub page"))
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_halign(Gtk.Align.CENTER)
+        btn = Gtk.Button(label=_("How to install croc"))
         btn.add_css_class("suggested-action")
         btn.add_css_class("pill")
         btn.connect(
@@ -69,7 +72,22 @@ class GatorWindow(Adw.ApplicationWindow):
                 self, None, None
             ),
         )
-        page.set_child(btn)
+        box.append(btn)
+        if on_retry is not None:
+            retry = Gtk.Button(label=_("Try again"))
+            retry.add_css_class("pill")
+            retry.connect("clicked", lambda *_: on_retry())
+            box.append(retry)
+        page.set_child(box)
+        self.toast_overlay.set_child(page)
+
+    def show_checking_croc(self) -> None:
+        page = Adw.StatusPage()
+        page.set_title(APP_NAME)
+        page.set_description(_("Checking for croc…"))
+        spinner = Gtk.Spinner()
+        spinner.start()
+        page.set_child(spinner)
         self.toast_overlay.set_child(page)
 
     def build_main_ui(self) -> tuple[SendPage, ReceivePage]:
@@ -82,12 +100,18 @@ class GatorWindow(Adw.ApplicationWindow):
         header.set_title_widget(title_label)
 
         menu = Gio.Menu()
-        menu.append(_("Preferences"), "app.preferences")
-        menu.append(_("About Gator"), "app.about")
-        menu.append(_("Quit"), "app.quit")
+        section = Gio.Menu()
+        section.append(_("Preferences"), "app.preferences")
+        section.append(_("Keyboard Shortcuts"), "app.shortcuts")
+        section.append(_("About Gator"), "app.about")
+        menu.append_section(None, section)
+        quit_section = Gio.Menu()
+        quit_section.append(_("Quit"), "app.quit")
+        menu.append_section(None, quit_section)
         menu_popover = Gtk.PopoverMenu.new_from_model(menu)
         menu_btn = Gtk.MenuButton()
         menu_btn.set_icon_name("open-menu-symbolic")
+        menu_btn.add_css_class("flat")
         menu_btn.set_tooltip_text(_("Menu"))
         set_a11y_label(menu_btn, _("Menu"))
         menu_btn.set_popover(menu_popover)
@@ -139,28 +163,30 @@ class GatorWindow(Adw.ApplicationWindow):
         bp.connect("unapply", on_wide)
         self.add_breakpoint(bp)
 
-        def init_layout():
-            if self.get_realized():
-                if self.get_width() <= 560:
-                    on_narrow()
-                else:
-                    on_wide()
-            else:
-                GLib.timeout_add(100, init_layout)
-            return False
-
-        # Popover parent requires a realized window; re-apply after first map.
-        def on_mapped(*_):
-            self._configure_menu_popover(narrow=self.get_width() <= 560)
-
-        self.connect("map", on_mapped)
-
-        GLib.idle_add(init_layout)
         stack.set_visible_child_name("send")
+        self._view_stack = stack
+
+        def on_stack_changed(*_args: object) -> None:
+            child = stack.get_visible_child_name() or "send"
+            title_label.set_subtitle(_("Send") if child == "send" else _("Receive"))
+
+        stack.connect("notify::visible-child", on_stack_changed)
+        on_stack_changed()
 
         self.send_page = send_page
         self.receive_page = receive_page
         return send_page, receive_page
+
+    def visible_tab(self) -> str:
+        stack = getattr(self, "_view_stack", None)
+        if stack is None:
+            return "send"
+        return stack.get_visible_child_name() or "send"
+
+    def set_visible_tab(self, name: str) -> None:
+        stack = getattr(self, "_view_stack", None)
+        if stack is not None:
+            stack.set_visible_child_name(name)
 
     def _configure_menu_popover(self, *, narrow: bool) -> None:
         """Keep the header menu popover inside the window on narrow viewports."""
@@ -194,8 +220,21 @@ def check_croc_available(callback: Callable[[bool], None]) -> None:
     def on_wait(_proc: Gio.Subprocess, result: Gio.AsyncResult) -> None:
         try:
             _proc.wait_finish(result)
-            GLib.idle_add(callback, True)
+            ok = (
+                bool(_proc.get_successful())
+                if hasattr(_proc, "get_successful")
+                else True
+            )
+            GLib.idle_add(callback, ok)
         except GLib.Error:
             GLib.idle_add(callback, False)
 
+    def timeout_kill() -> bool:
+        try:
+            proc.force_exit()
+        except GLib.Error:
+            pass
+        return False
+
+    GLib.timeout_add_seconds(5, timeout_kill)
     proc.wait_async(None, on_wait)

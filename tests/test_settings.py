@@ -16,6 +16,8 @@ def test_defaults_present():
     assert S.DEFAULTS["hash"] == ""
     assert S.DEFAULTS["curve"] == ""
     assert S.DEFAULTS["color_scheme"] == "default"
+    assert S.DEFAULTS["rename"] is False
+    assert S.APP_VERSION == "1.6.0"
 
 
 def test_validate_clamps_port():
@@ -32,6 +34,7 @@ def test_validate_hash():
     assert S.validate_settings({"hash": "foo"})["hash"] == ""
     assert S.validate_settings({"hash": ""})["hash"] == ""
     assert S.validate_settings({"hash": "imohash"})["hash"] == "imohash"
+    assert S.validate_settings({"hash": "highway"})["hash"] == "highway"
 
 
 def test_merge_with_defaults():

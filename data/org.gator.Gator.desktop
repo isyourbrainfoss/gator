@@ -10,5 +10,6 @@ Terminal=false
 Categories=Network;FileTransfer;GTK;GNOME;
 Keywords=file;transfer;send;receive;secure;p2p;croc;
 StartupNotify=true
-MimeType=application/x-croc-code;
+StartupWMClass=org.gator.Gator
+SingleMainWindow=true
 X-GNOME-UsesNotifications=true

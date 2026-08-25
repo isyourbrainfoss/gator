@@ -7,6 +7,11 @@ from gi.repository import Gtk
 
 def set_a11y_label(widget: Gtk.Widget, label: str) -> None:
     """Set accessible label when the GTK build exposes the API."""
+    try:
+        widget.update_property([Gtk.AccessibleProperty.LABEL], [label])
+        return
+    except (AttributeError, TypeError, RuntimeError):
+        pass
     setter = getattr(widget, "set_accessible_name", None)
     if callable(setter):
         setter(label)

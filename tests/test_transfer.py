@@ -4,16 +4,28 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import shutil
+
+import pytest
+
 from gator.transfer import (
+    ERROR_INVALID_CODE,
+    ERROR_PEER,
+    ERROR_REFUSED,
+    ERROR_RELAY,
     CrocReceiveTransfer,
     CrocSendTransfer,
     build_global_args,
     build_receive_args,
+    classify_croc_error,
     detect_transfer_phase,
+    extract_send_code,
+    format_argv_for_log,
     is_croc_status_line,
     normalize_croc_code,
     parse_progress_fraction,
     receive_env_for_code,
+    redact_argv,
     split_croc_output,
 )
 
@@ -28,6 +40,7 @@ def test_parse_progress_fraction():
     )
     assert parse_progress_fraction("Hashing download.zip  99%") == 0.99
     assert parse_progress_fraction("no progress here") is None
+    assert parse_progress_fraction("Save 50% off today") is None
 
 
 def test_split_croc_output_handles_carriage_returns():
@@ -114,7 +127,7 @@ def test_send_build_args_includes_files_and_code():
     s = {"default_code": "mycode", "git": True}
     t = CrocSendTransfer(
         settings=s,
-        files=["/tmp/a.txt", "/tmp/b"],
+        files=["/tmp/a.txt", "/tmp/b", "/tmp/--code"],
         excluded=["/tmp/ignore"],
         text="",
         on_log=lambda m: None,
@@ -123,9 +136,16 @@ def test_send_build_args_includes_files_and_code():
     )
     args = t._build_args()
     assert "send" in args
-    assert "--code" in args and "mycode" in args
+    assert "--code" not in args
+    assert "--ignore-stdin" in args
+    assert args.index("--ignore-stdin") < args.index("send")
+    assert "--yes" in args
+    assert "--disable-clipboard" in args
+    assert t.secret_env() == {"CROC_SECRET": "mycode"}
     assert "--git" in args
     assert "/tmp/a.txt" in args
+    assert "--" in args
+    assert args.index("--") < args.index("/tmp/--code")
     assert "--exclude" in args
     # exclude uses basename
     assert "ignore" in " ".join(args)
@@ -137,7 +157,7 @@ def test_send_text_mode_flag():
         files=[],
         excluded=[],
         text="hello world",
-        on_log=print,
+        on_log=lambda _m: None,
         on_code=lambda c: None,
         on_finished=lambda: None,
     )
@@ -146,6 +166,7 @@ def test_send_text_mode_flag():
     assert "hello world" in args
 
 
+@pytest.mark.skipif(shutil.which("croc") is None, reason="croc not installed")
 def test_cancel_finishes_transfer():
     from gi.repository import GLib
 
@@ -164,8 +185,17 @@ def test_cancel_finishes_transfer():
         on_finished=on_finished,
     )
     loop = GLib.MainLoop()
-    GLib.timeout_add(300, lambda: (transfer.cancel(), False))
-    GLib.timeout_add(4000, lambda: (loop.quit(), False))
+
+    def do_cancel() -> bool:
+        transfer.cancel()
+        return False
+
+    def do_quit() -> bool:
+        loop.quit()
+        return False
+
+    GLib.timeout_add(300, do_cancel)
+    GLib.timeout_add(4000, do_quit)
     transfer.start()
     loop.run()
     assert transfer.canceled
@@ -184,6 +214,8 @@ def test_detect_transfer_phase():
     assert detect_transfer_phase("Hashing download.zip  45%") == "hashing"
     assert detect_transfer_phase("download.zip  20% |██") == "sending"
     assert detect_transfer_phase("Receiving file (foo)  50%") == "receiving"
+    assert detect_transfer_phase("waiting for recipient...") == "waiting"
+    assert detect_transfer_phase("connecting...") == "connecting"
     assert detect_transfer_phase("Code is: abc") is None
 
 
@@ -192,7 +224,7 @@ def test_receive_build_args_respects_yes_pref():
     assert args[0] == "croc"
     assert "--relay" not in args
     assert "--yes" not in args
-    assert len(args) == 1
+    assert "--ignore-stdin" in args
 
 
 def test_receive_build_args_with_yes():
@@ -229,3 +261,58 @@ def test_receive_transfer_construction():
     )
     assert t._code == "abc123"
     assert not t.canceled
+
+
+def test_redact_argv_hides_secrets():
+    redacted = redact_argv(
+        ["croc", "--pass", "s3cr3t", "--text", "hello world", "send"]
+    )
+    assert "s3cr3t" not in redacted
+    assert "hello world" not in redacted
+    assert "***" in redacted
+    logged = format_argv_for_log(["croc", "--pass", "s3cr3t", "send", "--text", "note"])
+    assert "s3cr3t" not in logged
+    assert "note" not in logged
+
+
+def test_extract_send_code_case_insensitive():
+    assert extract_send_code("Code is: 1234-lion-stop-sofia") == "1234-lion-stop-sofia"
+    assert extract_send_code("code is: abc-def") == "abc-def"
+    assert extract_send_code("connecting...") is None
+
+
+def test_classify_croc_error():
+    assert classify_croc_error("code is invalid") == ERROR_INVALID_CODE
+    assert classify_croc_error("peer disconnected") == ERROR_PEER
+    assert classify_croc_error("refusing files") == ERROR_REFUSED
+    assert classify_croc_error("could not connect to relay") == ERROR_RELAY
+    assert classify_croc_error("Sending 10%") is None
+
+
+def test_build_global_args_rename_not_overwrite():
+    args = build_global_args({"rename": True, "overwrite": False})
+    assert "--rename" in args
+    assert "--overwrite" not in args
+    args = build_global_args({"rename": True, "overwrite": True})
+    assert "--overwrite" in args
+    assert "--rename" not in args
+
+
+def test_receive_force_yes_and_clipboard():
+    args = build_receive_args({"yes": False}, force_yes=True, disable_clipboard=True)
+    assert "--yes" in args
+    assert "--disable-clipboard" in args
+
+
+def test_empty_custom_code_has_no_secret_env():
+    t = CrocSendTransfer(
+        settings={"default_code": ""},
+        files=["/tmp/a.txt"],
+        excluded=[],
+        text="",
+        on_log=lambda _m: None,
+        on_code=lambda _c: None,
+        on_finished=lambda: None,
+    )
+    assert t.secret_env() is None
+    assert "--code" not in t._build_args()

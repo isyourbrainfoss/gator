@@ -25,6 +25,10 @@
       <default>false</default>
       <summary>Overwrite existing files without prompt</summary>
     </key>
+    <key name="rename" type="b">
+      <default>false</default>
+      <summary>Rename incoming files when the name already exists</summary>
+    </key>
 
     <!-- General -->
     <key name="debug" type="b"><default>false</default></key>

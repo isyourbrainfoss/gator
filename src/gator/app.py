@@ -43,6 +43,7 @@ from .transfer import (
     ERROR_REFUSED,
     ERROR_RELAY,
     ERROR_SPAWN,
+    MIN_CROC_CODE_LENGTH,
     CrocReceiveTransfer,
     CrocSendTransfer,
     normalize_croc_code,
@@ -526,6 +527,13 @@ class GatorApp(Adw.Application):
             return
         if not self.send_page.selected_files and not self.send_text:
             return
+        custom = (self.settings.get("default_code") or "").strip()
+        if custom and len(normalize_croc_code(custom)) < MIN_CROC_CODE_LENGTH:
+            self.send_page.show_banner(
+                _("Custom transfer codes must be at least 6 characters."),
+                error=True,
+            )
+            return
         if self.send_page.selected_files and self.send_text:
             self.add_toast(_("Sending files; text is omitted when files are selected."))
         self._clear_reset_source("send")
@@ -657,9 +665,9 @@ class GatorApp(Adw.Application):
             self.add_toast(_("Finish the current send first"))
             return
         code = normalize_croc_code(self.receive_page.get_code())
-        if not code:
+        if not code or len(code) < MIN_CROC_CODE_LENGTH:
             self.receive_page.mark_code_error()
-            self.add_toast(_("Enter a transfer code to start receiving."))
+            self.add_toast(_("Enter a transfer code of at least 6 characters."))
             return
         self.receive_page.set_code(code)
         self._clear_reset_source("receive")
@@ -707,7 +715,7 @@ class GatorApp(Adw.Application):
             msg = self._error_text(kind)
             if kind == ERROR_INVALID_CODE:
                 self.receive_page.mark_code_error()
-            self.receive_page.append_log(msg)
+            self.receive_page.append_log(msg, is_error=True)
             self.receive_page.show_transfer_complete(
                 canceled=False, success=False, message=msg, files=False
             )

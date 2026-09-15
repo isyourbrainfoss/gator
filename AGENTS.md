@@ -59,7 +59,7 @@ gator
 
 ## Current Status
 
-See `TASKS.md` for the roadmap. Core app, Flatpak, and transfer reliability (honest success/fail, croc 11.3.2) are in tree. Optional later: Flathub, transfer history, real screenshots.
+See `TASKS.md` for the roadmap. Core app, Flatpak, and transfer reliability (honest success/fail, croc 11.5.3) are in tree. Optional later: Flathub, transfer history, real screenshots.
 
 ## Testing Strategy
 

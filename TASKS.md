@@ -1,8 +1,8 @@
 # Gator – Task list
 
-## Status: v1.6.0
+## Status: v1.6.1
 
-Core app, Flatpak, and CI are in place. **v1.6** focuses on honest transfer results, croc 11.3.2, and UX/stability from a multi-agent review.
+Core app, Flatpak, and CI are in place. **v1.6.1** bundles croc 11.5.3 and parses its new send/progress/status output.
 
 ---
 
@@ -12,7 +12,7 @@ Core app, Flatpak, and CI are in place. **v1.6** focuses on honest transfer resu
 - Modular GTK4/libadwaita app (`app`, `window`, pages, `transfer`, `settings`, `preferences`)
 - `Gio.Subprocess` transfers with `\r`/`\n` progress parsing
 - GSettings + JSON fallback; empty croc defaults + legacy relay migration
-- Flatpak bundles croc **v11.3.2**; GitHub Pages repo (x86_64 + aarch64)
+- Flatpak bundles croc **v11.5.3**; GitHub Pages repo (x86_64 + aarch64)
 - Meson, desktop, metainfo, CI (black/ruff/mypy/pytest)
 - Unit tests: settings, transfer, qr, theme
 
@@ -43,6 +43,15 @@ Core app, Flatpak, and CI are in place. **v1.6** focuses on honest transfer resu
 - [x] Keyboard shortcuts, desktop notifications when unfocused, a11y `update_property`
 - [x] Preferences: editable rows, reset confirmation, hash `highway`/`xxhash`
 - [x] Version strings synced to 1.6.0
+
+### v1.6.1 — croc 11.5.3
+- [x] Bundled croc 11.3.2 → **11.5.3** (normalized progress bars, stdin-unavailable fix #1328, SOCKS5 via proxy, interrupt shutdown, storecrypto bounds check)
+- [x] Parse 11.5 send instructions (`croc phrase` / getcroc.com `?code=`) in addition to legacy `Code is:`
+- [x] Parse 11.5 progress (`50% |████| 100/200 B`) and receive status redraws (looking for sender, authenticating, opening transfer channels)
+- [x] Classify 11.5 errors (code too short, password mismatch, transfer disconnected, found no relay)
+- [x] Receive file indicator matches `Receiving 'file' (size)` without treating `croc-stdin-*` as files
+- [x] Custom codes still via `CROC_SECRET`; GUI still `--yes` and `--ignore-stdin`
+- [x] Version strings synced to 1.6.1
 
 ---
 
@@ -78,13 +87,14 @@ flatpak install --user --from \
 
 Debug: `GATOR_LOG=1 flatpak run org.gator.Gator`
 
-### Definition of done (v1.6)
+### Definition of done (v1.6.1)
 
 | Task | Done when |
 |------|-----------|
 | Honest outcomes | Invalid code / failed croc never shows success checkmarks or “Transfer finished” |
 | Custom codes | Prefs custom code ≥ 6 chars starts a send; receiver uses the same phrase |
-| croc 11.3.2 | `flatpak run --command=croc org.gator.Gator --version` reports 11.3.2 |
+| croc 11.5.3 | `flatpak run --command=croc org.gator.Gator --version` reports 11.5.3 |
+| 11.5 parser | Send instructions, progress bars, and receive status lines parse without a `Code is:` line |
 | Secrets | Shell log never contains `--pass` or `--text` values |
 | Temp files | `pytest tests/test_transfer.py` leaves no `croc-stdin-*` in the repo root |
 | Close confirm | Close/Ctrl+Q during send shows a dialog; dismiss keeps the transfer |

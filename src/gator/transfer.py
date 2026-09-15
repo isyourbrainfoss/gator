@@ -13,6 +13,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 from gi.repository import Gio, GLib
 
@@ -20,23 +21,62 @@ from .settings import CROC_BINARY
 
 logger = logging.getLogger(__name__)
 
+# croc rejects codes shorter than this (codephrase.ErrCodeTooShort).
+MIN_CROC_CODE_LENGTH = 6
+
 _PROGRESS_RE = re.compile(r"(\d{1,3})%")
 _CODE_IS_RE = re.compile(r"^code is:\s*", re.IGNORECASE)
+_CODE_QUERY_RE = re.compile(r"[?&]code=([^&\s]+)", re.IGNORECASE)
+_TRAILING_PAREN_RE = re.compile(r"\s*\([^)]*\)\s*$")
+_PASS_IN_LINE_RE = re.compile(r"(--pass\s+)\S+", re.IGNORECASE)
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 _ACCEPT_PROMPT_RE = re.compile(r"^Accept .+ \(.*\)\? \(Y/n\)", re.IGNORECASE)
+_CROC_SUBCOMMANDS = frozenset(
+    {"send", "relay", "ssh", "store", "help", "update", "upgrade"}
+)
+_CROC_FLAGS_WITH_VALUE = frozenset(
+    {
+        "--relay",
+        "--pass",
+        "--code",
+        "--socks5",
+        "--connect",
+        "--curve",
+        "--hash",
+        "--multicast",
+        "--ip",
+        "--out",
+        "--throttleUpload",
+    }
+)
 _CROC_STATUS_PREFIXES = (
     "connecting",
     "securing channel",
     "receiving (<-",
     "receiving (->",
+    "receiving (",
+    "receiving '",
+    'receiving "',
+    "receiving file (",
     "sending (<-",
     "sending (->",
+    "sending (",
+    "sending '",
+    'sending "',
     "running:",
     "waiting",
-    "receiving file (",
+    "looking for",
+    "authenticating",
+    "opening transfer",
     "receiving transfer",
     "starting croc",
     "code is:",
     "hashing",
+    "on the other computer",
+    "or open:",
+    "already up to date",
+    "no files transferred",
+    "a newer croc version",
 )
 _CROC_STATUS_SUBSTRINGS = (
     "transfer finished",
@@ -50,8 +90,16 @@ _CROC_STATUS_SUBSTRINGS = (
     "peer disconnected",
     "peer error",
     "refusing files",
+    "refused files",
     "could not connect",
     "permission denied",
+    "retrying securely",
+    "transfer interruption",
+    "found no relay",
+    "password mismatch",
+    "code is too short",
+    "croc update",
+    "getcroc.com/?code=",
 )
 _REDACT_FLAGS = {"--pass", "--code", "--text"}
 _MAX_LOG_LINES = 500
@@ -69,10 +117,25 @@ ERROR_FAILED = "failed"
 _ERROR_KIND_MATCHERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         ERROR_INVALID_CODE,
-        ("code is invalid", "could not find room", "room does not exist"),
+        (
+            "code is invalid",
+            "could not find room",
+            "room does not exist",
+            "password mismatch",
+            "code is too short",
+            "pake not successful",
+        ),
     ),
-    (ERROR_PEER, ("peer disconnected", "peer error")),
-    (ERROR_REFUSED, ("refusing files", "refusing file")),
+    (
+        ERROR_PEER,
+        (
+            "peer disconnected",
+            "peer error",
+            "could not secure channel",
+            "transfer disconnected",
+        ),
+    ),
+    (ERROR_REFUSED, ("refusing files", "refusing file", "refused files")),
     (
         ERROR_RELAY,
         (
@@ -83,6 +146,8 @@ _ERROR_KIND_MATCHERS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "network is unreachable",
             "dial tcp",
             "timeout",
+            "found no relay",
+            "could not select public relay",
         ),
     ),
     (
@@ -92,9 +157,19 @@ _ERROR_KIND_MATCHERS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+def strip_ansi(text: str) -> str:
+    """Remove CSI color sequences that a TTY croc may emit."""
+    return _ANSI_RE.sub("", text)
+
+
+def redact_croc_line(line: str) -> str:
+    """Hide ``--pass`` values that croc 11.5 prints in send instructions."""
+    return _PASS_IN_LINE_RE.sub(r"\1***", line)
+
+
 def is_croc_status_line(line: str) -> bool:
     """True if *line* is croc CLI status output, not received text payload."""
-    s = line.strip()
+    s = strip_ansi(line).strip()
     if not s:
         return True
     if "%" in s or "|" in s:
@@ -111,26 +186,95 @@ def is_croc_status_line(line: str) -> bool:
     return False
 
 
-def normalize_croc_code(code: str) -> str:
-    """Normalize a user-entered croc code (paste quirks, spacing)."""
-    normalized = code.strip()
-    normalized = _CODE_IS_RE.sub("", normalized)
-    return normalized.replace(" ", "-")
+def is_receive_file_indicator(line: str) -> bool:
+    """True if *line* reports an incoming named file (not text/stdin)."""
+    s = strip_ansi(line).strip()
+    if not s or "croc-stdin-" in s:
+        return False
+    if s.startswith("Receiving file ("):
+        return True
+    if s.startswith("Receiving '") or s.startswith('Receiving "'):
+        return True
+    return False
+
+
+def _code_from_croc_instruction(line: str) -> str | None:
+    """Parse ``croc [--flags] SECRET`` from croc 11.5 send instructions."""
+    cleaned = _TRAILING_PAREN_RE.sub("", line).strip()
+    parts = cleaned.split()
+    if not parts or parts[0].lower() != "croc":
+        return None
+    i = 1
+    while i < len(parts):
+        tok = parts[i]
+        if tok.startswith("--"):
+            name, eq, _rest = tok.partition("=")
+            if eq:
+                i += 1
+                continue
+            if name in _CROC_FLAGS_WITH_VALUE:
+                i += 2
+                continue
+            i += 1
+            continue
+        if tok.startswith("-") and tok != "-":
+            i += 1
+            continue
+        break
+    if i >= len(parts):
+        return None
+    candidate = parts[i]
+    if candidate.lower() in _CROC_SUBCOMMANDS:
+        return None
+    return candidate or None
 
 
 def extract_send_code(line: str) -> str | None:
-    """Return the transfer code from a croc 'Code is:' line, or None."""
-    stripped = line.strip()
-    match = _CODE_IS_RE.match(stripped)
-    if match is None:
+    """Return the transfer code from croc send output, or None.
+
+    croc ≤11.3 printed ``Code is: phrase``. croc 11.5 prints::
+
+        On the other computer, run:
+          croc [--relay host] phrase
+        Or open:
+          https://getcroc.com/?code=phrase
+    """
+    stripped = strip_ansi(line).strip()
+    if not stripped:
         return None
-    code = stripped[match.end() :].strip()
-    return code or None
+    match = _CODE_IS_RE.match(stripped)
+    if match is not None:
+        code = stripped[match.end() :].strip()
+        return code or None
+    url_match = _CODE_QUERY_RE.search(stripped)
+    if url_match:
+        return unquote(url_match.group(1)).strip() or None
+    if stripped.lower().startswith("croc"):
+        return _code_from_croc_instruction(stripped)
+    return None
+
+
+def normalize_croc_code(code: str) -> str:
+    """Normalize a user-entered croc code (paste quirks, spacing, 11.5 banners)."""
+    normalized = strip_ansi(code).strip()
+    if not normalized:
+        return ""
+    extracted = extract_send_code(normalized)
+    if extracted is None:
+        for part in normalized.splitlines():
+            extracted = extract_send_code(part)
+            if extracted:
+                break
+    if extracted:
+        normalized = extracted
+    else:
+        normalized = _CODE_IS_RE.sub("", normalized)
+    return normalized.replace(" ", "-")
 
 
 def classify_croc_error(line: str) -> str | None:
     """Return an error kind for a croc status line, or None."""
-    low = line.lower()
+    low = strip_ansi(line).lower()
     for kind, needles in _ERROR_KIND_MATCHERS:
         if any(needle in low for needle in needles):
             return kind
@@ -178,16 +322,25 @@ def apply_subprocess_status(proc: Gio.Subprocess) -> tuple[int, bool]:
 
 def detect_transfer_phase(line: str) -> str | None:
     """Return hashing/sending/receiving/waiting/connecting, or None."""
-    low = line.lower()
-    if "hashing" in low and "%" in line:
+    text = strip_ansi(line)
+    low = text.lower()
+    if "hashing" in low and "%" in text:
         return "hashing"
-    if parse_progress_fraction(line) is not None:
+    if parse_progress_fraction(text) is not None:
         if "receiving" in low:
             return "receiving"
         return "sending"
+    if low.startswith("looking for"):
+        return "connecting"
     if low.startswith("waiting") or "waiting for" in low:
         return "waiting"
-    if low.startswith("connecting") or low.startswith("securing"):
+    if (
+        low.startswith("connecting")
+        or low.startswith("securing")
+        or low.startswith("authenticating")
+        or "opening transfer" in low
+        or "retrying securely" in low
+    ):
         return "connecting"
     return None
 
@@ -213,18 +366,30 @@ def receive_env_for_code(code: str) -> dict[str, str]:
 
 
 def parse_progress_fraction(line: str) -> float | None:
-    """Return 0.0–1.0 if *line* looks like a croc progress update."""
-    if "%" not in line:
+    """Return 0.0–1.0 if *line* looks like a croc progress update.
+
+    croc 11.5 normalized bars look like::
+
+        Hashing croc.txt  50% |██████████          | 100/200 B
+        download.zip  20% |████                | (1.7/8.3 GB, 117 MB/s)
+    """
+    text = strip_ansi(line)
+    if "%" not in text:
         return None
-    low = line.lower()
+    low = text.lower()
+    has_bar = "|" in text
+    has_bytes = bool(re.search(r"\d+\s*/\s*\d+\s*[kmg]?b\b", low))
+    has_speed = any(unit in low for unit in ("b/s", "kb/s", "mb/s", "gb/s"))
     if (
-        "|" not in line
+        not has_bar
         and "hashing" not in low
         and "receiving" not in low
         and "sending" not in low
+        and not has_bytes
+        and not has_speed
     ):
         return None
-    match = _PROGRESS_RE.search(line)
+    match = _PROGRESS_RE.search(text)
     if not match:
         return None
     value = int(match.group(1))
@@ -474,19 +639,19 @@ class CrocTransfer:
         self._read_buf, segments = split_croc_output(chunk, self._read_buf)
         for segment, from_newline in segments:
             self._emit_segment(segment, from_newline=from_newline)
-        trailing = self._read_buf.rstrip()
+        trailing = strip_ansi(self._read_buf).rstrip()
         if trailing:
             # Progress redraws arrive as a partial CR line; do not parse codes.
             self._handle_line(trailing, complete=False)
 
     def _flush_read_buffer(self) -> None:
-        trailing = self._read_buf.rstrip()
+        trailing = strip_ansi(self._read_buf).rstrip()
         if trailing:
             self._emit_segment(trailing, from_newline=True)
         self._read_buf = ""
 
     def _emit_segment(self, segment: str, *, from_newline: bool) -> None:
-        stripped = segment.rstrip()
+        stripped = strip_ansi(segment).rstrip()
         if not stripped:
             return
         is_progress = parse_progress_fraction(stripped) is not None
@@ -494,7 +659,7 @@ class CrocTransfer:
             self._lines.append(stripped)
             if len(self._lines) > _MAX_LOG_LINES:
                 self._lines = self._lines[-_MAX_LOG_LINES:]
-            self._on_log(stripped)
+            self._on_log(redact_croc_line(stripped))
         self._handle_line(stripped, complete=from_newline or not is_progress)
 
     def _handle_line(self, line: str, *, complete: bool) -> None:
@@ -631,6 +796,18 @@ class CrocSendTransfer(CrocTransfer):
             return None
         return {"CROC_SECRET": normalize_croc_code(custom)}
 
+    def _maybe_emit_known_code(self) -> None:
+        """Show a pref custom code immediately; croc 11.5 no longer prints 'Code is:'."""
+        if self._code_emitted:
+            return
+        env = self.secret_env()
+        if not env:
+            return
+        code = env.get("CROC_SECRET")
+        if code:
+            self._code_emitted = True
+            self._on_code(code)
+
     def _build_args(self) -> list[str]:
         s = self._settings
         args = [CROC_BINARY] + build_global_args(
@@ -679,6 +856,7 @@ class CrocSendTransfer(CrocTransfer):
         self._on_log("Starting croc send")
         self._temp_cwd = tempfile.mkdtemp(prefix="gator-croc-")
         self._spawn(args, env=self.secret_env(), cwd=self._temp_cwd)
+        self._maybe_emit_known_code()
 
 
 class CrocReceiveTransfer(CrocTransfer):
@@ -717,7 +895,7 @@ class CrocReceiveTransfer(CrocTransfer):
 
     def _handle_line(self, line: str, *, complete: bool) -> None:
         super()._handle_line(line, complete=complete)
-        if "Receiving file (" in line:
+        if is_receive_file_indicator(line):
             self._saw_file_indicator = True
 
     def _launch(self) -> None:

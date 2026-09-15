@@ -17,7 +17,7 @@ def test_defaults_present():
     assert S.DEFAULTS["curve"] == ""
     assert S.DEFAULTS["color_scheme"] == "default"
     assert S.DEFAULTS["rename"] is False
-    assert S.APP_VERSION == "1.6.0"
+    assert S.APP_VERSION == "1.6.1"
 
 
 def test_validate_clamps_port():

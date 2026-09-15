@@ -416,7 +416,7 @@ class ReceivePage(Gtk.Box):
         )
         self._error_tag_applied = True
 
-    def append_log(self, text: str) -> None:
+    def append_log(self, text: str, *, is_error: bool = False) -> None:
         self._ensure_error_tag()
         buf = self.receive_log.get_buffer()
         if buf.get_line_count() > _MAX_LOG_LINES:
@@ -428,11 +428,8 @@ class ReceivePage(Gtk.Box):
                 buf.delete(start, end)
         end = buf.get_end_iter()
         low = text.lower()
-        if (
-            low.startswith("error")
-            or "code is invalid" in low
-            or "peer disconnected" in low
-        ):
+        errorish = is_error or low.startswith("error")
+        if errorish:
             buf.insert_with_tags_by_name(end, text + "\n", "error")
         else:
             buf.insert(end, text + "\n")

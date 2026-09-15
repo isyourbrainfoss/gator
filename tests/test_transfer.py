@@ -13,6 +13,7 @@ from gator.transfer import (
     ERROR_PEER,
     ERROR_REFUSED,
     ERROR_RELAY,
+    MIN_CROC_CODE_LENGTH,
     CrocReceiveTransfer,
     CrocSendTransfer,
     build_global_args,
@@ -22,10 +23,12 @@ from gator.transfer import (
     extract_send_code,
     format_argv_for_log,
     is_croc_status_line,
+    is_receive_file_indicator,
     normalize_croc_code,
     parse_progress_fraction,
     receive_env_for_code,
     redact_argv,
+    redact_croc_line,
     split_croc_output,
 )
 
@@ -41,6 +44,27 @@ def test_parse_progress_fraction():
     assert parse_progress_fraction("Hashing download.zip  99%") == 0.99
     assert parse_progress_fraction("no progress here") is None
     assert parse_progress_fraction("Save 50% off today") is None
+    # croc 11.5 normalized progressbar (20-cell bar + byte count, optional speed/ETA)
+    assert (
+        parse_progress_fraction(
+            "Hashing croc.txt  50% |██████████          | 100/200 B"
+        )
+        == 0.50
+    )
+    assert (
+        parse_progress_fraction("croc.txt  50% |██████████          | 100/200 B")
+        == 0.50
+    )
+    assert (
+        parse_progress_fraction(
+            "download.zip  20% |████                | (1.7/8.3 GB, 117 MB/s) [1s:8s]"
+        )
+        == 0.20
+    )
+    assert (
+        parse_progress_fraction("very-long-filen...  10% |██                  |")
+        == 0.10
+    )
 
 
 def test_split_croc_output_handles_carriage_returns():
@@ -217,6 +241,25 @@ def test_detect_transfer_phase():
     assert detect_transfer_phase("waiting for recipient...") == "waiting"
     assert detect_transfer_phase("connecting...") == "connecting"
     assert detect_transfer_phase("Code is: abc") is None
+    assert detect_transfer_phase("looking for sender...") == "connecting"
+    assert detect_transfer_phase("waiting for sender...") == "waiting"
+    assert detect_transfer_phase("authenticating code...") == "connecting"
+    assert detect_transfer_phase("opening transfer channels...") == "connecting"
+    assert detect_transfer_phase("waiting for file list...") == "waiting"
+    assert (
+        detect_transfer_phase(
+            "Sender detected a transfer interruption. Retrying securely..."
+        )
+        == "connecting"
+    )
+    assert (
+        detect_transfer_phase("Hashing croc.txt  50% |██████████          | 100/200 B")
+        == "hashing"
+    )
+    assert (
+        detect_transfer_phase("croc.txt  50% |██████████          | 100/200 B")
+        == "sending"
+    )
 
 
 def test_receive_build_args_respects_yes_pref():
@@ -246,6 +289,15 @@ def test_is_croc_status_line_filters_cli_output():
     assert is_croc_status_line("On UNIX systems, to receive with croc you either need")
     assert not is_croc_status_line("hello from sender")
     assert not is_croc_status_line("Line one of a note")
+    assert is_croc_status_line("looking for sender...")
+    assert is_croc_status_line("authenticating code...")
+    assert is_croc_status_line("opening transfer channels...")
+    assert is_croc_status_line("On the other computer, run:")
+    assert is_croc_status_line("Receiving 'sample.txt' (12 B)")
+    assert is_croc_status_line("Sending (198.51.100.10->203.0.113.20)")
+    assert is_croc_status_line("A newer croc version is available: v11.5.3")
+    assert is_croc_status_line("Already up to date: 'test'")
+    assert is_croc_status_line("No files transferred.")
 
 
 def test_receive_transfer_construction():
@@ -279,6 +331,21 @@ def test_extract_send_code_case_insensitive():
     assert extract_send_code("Code is: 1234-lion-stop-sofia") == "1234-lion-stop-sofia"
     assert extract_send_code("code is: abc-def") == "abc-def"
     assert extract_send_code("connecting...") is None
+    assert extract_send_code("  croc dent-ounce-fend") == "dent-ounce-fend"
+    assert (
+        extract_send_code("https://getcroc.com/?code=dent-ounce-fend")
+        == "dent-ounce-fend"
+    )
+    assert (
+        extract_send_code("  croc --relay 127.0.0.1:9 --pass s3cr3t barn-boxer-atom")
+        == "barn-boxer-atom"
+    )
+    assert (
+        extract_send_code("  croc film-alibi-jet (code copied to clipboard)")
+        == "film-alibi-jet"
+    )
+    assert extract_send_code("croc send file.txt") is None
+    assert extract_send_code("On the other computer, run:") is None
 
 
 def test_classify_croc_error():
@@ -287,6 +354,21 @@ def test_classify_croc_error():
     assert classify_croc_error("refusing files") == ERROR_REFUSED
     assert classify_croc_error("could not connect to relay") == ERROR_RELAY
     assert classify_croc_error("Sending 10%") is None
+    assert (
+        classify_croc_error("code is too short (must be at least 6 characters)")
+        == ERROR_INVALID_CODE
+    )
+    assert classify_croc_error("password mismatch") == ERROR_INVALID_CODE
+    assert classify_croc_error("refused files") == ERROR_REFUSED
+    assert (
+        classify_croc_error("could not connect to : found no relay addresses")
+        == ERROR_RELAY
+    )
+    assert (
+        classify_croc_error("transfer disconnected after 10 reconnect attempts")
+        == ERROR_PEER
+    )
+    assert classify_croc_error("could not secure channel") == ERROR_PEER
 
 
 def test_build_global_args_rename_not_overwrite():
@@ -316,3 +398,105 @@ def test_empty_custom_code_has_no_secret_env():
     )
     assert t.secret_env() is None
     assert "--code" not in t._build_args()
+
+
+def test_normalize_croc_code_from_croc_11_5_paste():
+    banner = (
+        "On the other computer, run:\n"
+        "  croc dent-ounce-fend\n"
+        "\n"
+        "Or open:\n"
+        "  https://getcroc.com/?code=dent-ounce-fend\n"
+    )
+    assert normalize_croc_code(banner) == "dent-ounce-fend"
+    assert (
+        normalize_croc_code("https://getcroc.com/?code=film-alibi-jet")
+        == "film-alibi-jet"
+    )
+    assert normalize_croc_code("  croc --relay 1.2.3.4:9009 secret-phrase") == (
+        "secret-phrase"
+    )
+
+
+def test_is_receive_file_indicator():
+    assert is_receive_file_indicator("Receiving file (foo.txt)")
+    assert is_receive_file_indicator("Receiving 'sample.txt' (12 B)")
+    assert is_receive_file_indicator('Receiving "notes.md" (1.2 KB)')
+    assert not is_receive_file_indicator("Receiving (<-83.109.115.4:35166)")
+    assert not is_receive_file_indicator("Receiving (198.51.100.10<-203.0.113.20)")
+    assert not is_receive_file_indicator("Receiving 'croc-stdin-abc123' (11 B)")
+    assert not is_receive_file_indicator("connecting...")
+
+
+def test_redact_croc_line_hides_pass_in_instructions():
+    line = "  croc --relay 127.0.0.1:9 --pass s3cr3t barn-boxer-atom"
+    redacted = redact_croc_line(line)
+    assert "s3cr3t" not in redacted
+    assert "--pass ***" in redacted
+    assert "barn-boxer-atom" in redacted
+
+
+def test_maybe_emit_known_custom_code():
+    codes: list[str] = []
+    t = CrocSendTransfer(
+        settings={"default_code": "my-secret-code"},
+        files=["/tmp/a.txt"],
+        excluded=[],
+        text="",
+        on_log=lambda _m: None,
+        on_code=codes.append,
+        on_finished=lambda: None,
+    )
+    t._maybe_emit_known_code()
+    assert codes == ["my-secret-code"]
+    t._maybe_emit_known_code()
+    assert codes == ["my-secret-code"]
+
+
+def test_build_global_args_socks5_and_connect():
+    args = build_global_args(
+        {"socks5": "127.0.0.1:9050", "connect": "http://proxy:8080"}
+    )
+    assert "--socks5" in args and "127.0.0.1:9050" in args
+    assert "--connect" in args and "http://proxy:8080" in args
+
+
+def test_min_croc_code_length_matches_croc():
+    assert MIN_CROC_CODE_LENGTH == 6
+
+
+def test_split_croc_output_receive_status_redraws():
+    chunk = (
+        "connecting...\rlooking for sender...\rwaiting for sender...\r"
+        "                     \r"
+    )
+    buf, segments = split_croc_output(chunk)
+    assert buf == ""
+    texts = [s for s, _ in segments]
+    assert "connecting..." in texts
+    assert "looking for sender..." in texts
+    assert "waiting for sender..." in texts
+    assert all(not nl for _, nl in segments)
+
+
+def test_gui_send_keeps_yes_and_ignore_stdin():
+    t = CrocSendTransfer(
+        settings={"yes": False},
+        files=["/tmp/a.txt"],
+        excluded=[],
+        text="",
+        on_log=lambda _m: None,
+        on_code=lambda _c: None,
+        on_finished=lambda: None,
+    )
+    args = t._build_args()
+    assert "--yes" in args
+    assert "--ignore-stdin" in args
+    assert "--code" not in args
+
+
+def test_gui_receive_keeps_yes_and_ignore_stdin():
+    args = build_receive_args({"yes": False}, force_yes=True, disable_clipboard=True)
+    assert "--yes" in args
+    assert "--ignore-stdin" in args
+    assert "--code" not in args

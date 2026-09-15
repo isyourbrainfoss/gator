@@ -62,6 +62,17 @@
   <content_rating type="oars-1.1" />
   
   <releases>
+    <release version="1.6.1" date="2026-09-15">
+      <description>
+        <p>Bundled croc 11.5.3 and transfer parsing for its new CLI output:</p>
+        <ul>
+          <li>Flatpak now ships croc 11.5.3 (normalized progress bars, stdin-unavailable fix, SOCKS5 hostname resolution, interrupt shutdown)</li>
+          <li>Parse 11.5 send instructions (no more “Code is:”), getcroc.com links, and receive status redraws</li>
+          <li>Classify new croc errors (code too short, password mismatch, disconnected after reconnect)</li>
+          <li>Custom send codes still use CROC_SECRET, never --code; GUI still passes --yes and --ignore-stdin</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.0" date="2026-08-25">
       <description>
         <p>Reliability, croc 11.3.2, and clearer transfer results:</p>

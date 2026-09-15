@@ -288,7 +288,9 @@ class PreferencesDialog:
             self._make_entry_row(
                 "default_code",
                 _("Default custom transfer code"),
-                tooltip=_("Optional – leave empty for a random code"),
+                tooltip=_(
+                    "Optional – at least 6 characters, or empty for a random code"
+                ),
             )
         )
         hash_options = [_("Default (croc)"), "imohash", "md5", "highway"]

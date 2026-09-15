@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ── Application constants (source of truth) ──────────────────────────────────
 APP_ID = "org.gator.Gator"
 APP_NAME = "Gator"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.6.1"
 
 CROC_BINARY = "croc"
 

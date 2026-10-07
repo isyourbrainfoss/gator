@@ -1,0 +1,62 @@
+name: Release ship helper
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to create (empty to skip)
+        required: false
+        default: v1.6.2
+        type: string
+      tag_message:
+        required: false
+        default: v1.6.2 — croc 11.5.4
+        type: string
+      sync_from_branch:
+        description: Branch to copy remaining docs from
+        required: false
+        default: bump/croc-11.5.4
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync TASKS and metainfo from bump branch
+        env:
+          SRC: ${{ inputs.sync_from_branch }}
+        run: |
+          set -euo pipefail
+          BASE="https://raw.githubusercontent.com/isyourbrainfoss/gator/${SRC}"
+          curl -fsSL "$BASE/TASKS.md" -o TASKS.md
+          curl -fsSL "$BASE/data/org.gator.Gator.metainfo.xml" -o data/org.gator.Gator.metainfo.xml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add TASKS.md data/org.gator.Gator.metainfo.xml
+          if ! git diff --cached --quiet; then
+            git commit -m "Docs/metainfo: v1.6.2 / croc 11.5.4"
+            git push origin HEAD:master
+          else
+            echo "docs already synced"
+          fi
+
+      - name: Create release tag
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+          MSG: ${{ inputs.tag_message }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          git pull --ff-only origin master
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag exists: $TAG"
+            exit 0
+          fi
+          git tag -a "$TAG" -m "$MSG"
+          git push origin "refs/tags/$TAG"

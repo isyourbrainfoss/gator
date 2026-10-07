@@ -1,0 +1,43 @@
+name: Create release tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag name (e.g. v1.6.2)
+        required: true
+        type: string
+      message:
+        description: Annotated tag message
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push annotated tag
+        env:
+          TAG: ${{ inputs.tag }}
+          MSG: ${{ inputs.message }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -z "$MSG" ]; then
+            MSG="$TAG"
+          fi
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists" >&2
+            exit 1
+          fi
+          git tag -a "$TAG" -m "$MSG"
+          git push origin "refs/tags/$TAG"

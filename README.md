@@ -1,6 +1,6 @@
 # Gator
 
-GTK4/Libadwaita app for [croc](https://github.com/schollz/croc) — send files, folders, and text with end-to-end encryption. Flatpak currently bundles **croc 11.5.3**.
+GTK4/Libadwaita app for [croc](https://github.com/schollz/croc) — send files, folders, and text with end-to-end encryption. Flatpak currently bundles **croc 11.5.4**.
 
 **Flatpak includes croc** — no separate croc install needed.
 

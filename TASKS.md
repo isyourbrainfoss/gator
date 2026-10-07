@@ -78,3 +78,29 @@ Core app, Flatpak, and CI are in place. **v1.6.2** bundles croc 11.5.4 and parse
 
 ## Distribution
 
+| Channel | How users get updates |
+|---------|----------------------|
+| **Flatpak (Pages)** | Push to `master` → Publish Flatpak workflow |
+| **GitHub Release** | Optional changelog only; not required for Flatpak |
+| **pip / source** | Needs `croc` on PATH |
+
+Install:
+```bash
+flatpak install --user --from \
+  https://raw.githubusercontent.com/isyourbrainfoss/gator/master/org.gator.Gator.flatpakref
+```
+
+Debug: `GATOR_LOG=1 flatpak run org.gator.Gator`
+
+### Definition of done (v1.6.2)
+
+| Task | Done when |
+|------|-----------|
+| Honest outcomes | Invalid code / failed croc never shows success checkmarks or “Transfer finished” |
+| Custom codes | Prefs custom code ≥ 6 chars starts a send; receiver uses the same phrase |
+| croc 11.5.4 | `flatpak run --command=croc org.gator.Gator --version` reports 11.5.4 |
+| 11.5 parser | Send instructions, progress bars, and receive status lines parse without a `Code is:` line |
+| Secrets | Shell log never contains `--pass` or `--text` values |
+| Temp files | `pytest tests/test_transfer.py` leaves no `croc-stdin-*` in the repo root |
+| Close confirm | Close/Ctrl+Q during send shows a dialog; dismiss keeps the transfer |
+| Tests | `pytest tests/ -q` and `ruff check .` and `black --check .` pass |

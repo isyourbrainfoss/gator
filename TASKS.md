@@ -1,8 +1,8 @@
 # Gator – Task list
 
-## Status: v1.6.1
+## Status: v1.6.2
 
-Core app, Flatpak, and CI are in place. **v1.6.1** bundles croc 11.5.3 and parses its new send/progress/status output.
+Core app, Flatpak, and CI are in place. **v1.6.2** bundles croc 11.5.4 and parses its new send/progress/status output.
 
 ---
 
@@ -12,7 +12,7 @@ Core app, Flatpak, and CI are in place. **v1.6.1** bundles croc 11.5.3 and parse
 - Modular GTK4/libadwaita app (`app`, `window`, pages, `transfer`, `settings`, `preferences`)
 - `Gio.Subprocess` transfers with `\r`/`\n` progress parsing
 - GSettings + JSON fallback; empty croc defaults + legacy relay migration
-- Flatpak bundles croc **v11.5.3**; GitHub Pages repo (x86_64 + aarch64)
+- Flatpak bundles croc **v11.5.4**; GitHub Pages repo (x86_64 + aarch64)
 - Meson, desktop, metainfo, CI (black/ruff/mypy/pytest)
 - Unit tests: settings, transfer, qr, theme
 
@@ -43,6 +43,11 @@ Core app, Flatpak, and CI are in place. **v1.6.1** bundles croc 11.5.3 and parse
 - [x] Keyboard shortcuts, desktop notifications when unfocused, a11y `update_property`
 - [x] Preferences: editable rows, reset confirmation, hash `highway`/`xxhash`
 - [x] Version strings synced to 1.6.0
+
+### v1.6.2 — croc 11.5.4
+- [x] Bundled croc 11.5.3 → **11.5.4** (stored-transfer SOCKS5/connect, int64 chunks, stdout/zip overwrite safety, deps)
+- [x] CI Linux croc install pin 11.3.2 → **11.5.4**
+- [x] No parser/argv adaptations (bugfix release)
 
 ### v1.6.1 — croc 11.5.3
 - [x] Bundled croc 11.3.2 → **11.5.3** (normalized progress bars, stdin-unavailable fix #1328, SOCKS5 via proxy, interrupt shutdown, storecrypto bounds check)
@@ -87,13 +92,13 @@ flatpak install --user --from \
 
 Debug: `GATOR_LOG=1 flatpak run org.gator.Gator`
 
-### Definition of done (v1.6.1)
+### Definition of done (v1.6.2)
 
 | Task | Done when |
 |------|-----------|
 | Honest outcomes | Invalid code / failed croc never shows success checkmarks or “Transfer finished” |
 | Custom codes | Prefs custom code ≥ 6 chars starts a send; receiver uses the same phrase |
-| croc 11.5.3 | `flatpak run --command=croc org.gator.Gator --version` reports 11.5.3 |
+| croc 11.5.4 | `flatpak run --command=croc org.gator.Gator --version` reports 11.5.4 |
 | 11.5 parser | Send instructions, progress bars, and receive status lines parse without a `Code is:` line |
 | Secrets | Shell log never contains `--pass` or `--text` values |
 | Temp files | `pytest tests/test_transfer.py` leaves no `croc-stdin-*` in the repo root |

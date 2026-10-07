@@ -64,7 +64,7 @@
   <releases>
     <release version="1.6.2" date="2026-10-07">
       <description>
-        <p>Bundled croc 11.5.4 (bugfix and dependency upgrades):</p>
+        <p>Bundled croc 11.5.4 (bugfixes and dependency upgrades):</p>
         <ul>
           <li>Flatpak now ships croc 11.5.4 (SOCKS5/connect for stored transfers, int64 chunk indices, stdout/zip overwrite fixes)</li>
           <li>No CLI or parser changes required — argv and progress parsing unchanged from 11.5.3</li>

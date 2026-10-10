@@ -3,7 +3,6 @@
 > **Note**
 > This is very experimental. Assume nothing here is written, or necessarily read through or fully understood, by a human unless stated, and that includes this text. Use it at your own risk, but you're encouraged to reuse any parts you find useful. The human work here is mainly ideas, testing in reality, and persistence with a vision.
 
-
 GTK4/Libadwaita app for [croc](https://github.com/schollz/croc) — send files, folders, and text with end-to-end encryption. Flatpak currently bundles **croc 11.5.4**.
 
 **Flatpak includes croc** — no separate croc install needed.

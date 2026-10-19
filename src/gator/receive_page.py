@@ -87,18 +87,11 @@ class ReceivePage(Gtk.Box):
         self.code_entry = Adw.EntryRow(title=_("Transfer code"))
         self.code_entry.set_show_apply_button(False)
         self.code_entry.connect("changed", lambda *_: self._on_code_changed())
-        key_ctl = Gtk.EventControllerKey()
-
-        def on_code_key(
-            _c: Gtk.EventControllerKey, keyval: int, _code: int, _state: int
-        ) -> bool:
-            if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
-                self.emit("start-receive")
-                return True
-            return False
-
-        key_ctl.connect("key-pressed", on_code_key)
-        self.code_entry.add_controller(key_ctl)
+        # The embedded GtkText consumes Return before a bubble-phase key
+        # controller on the row sees it; AdwEntryRow re-emits it here.
+        self.code_entry.connect(
+            "entry-activated", lambda *_: self.emit("start-receive")
+        )
 
         paste_btn = Gtk.Button(icon_name="edit-paste-symbolic")
         paste_btn.add_css_class("flat")

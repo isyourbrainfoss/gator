@@ -76,7 +76,7 @@ class GatorApp(Adw.Application):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
         GLib.set_application_name(APP_NAME)
         GLib.set_prgname(APP_ID)
-        self.set_default_icon_name(APP_ID)
+        Gtk.Window.set_default_icon_name(APP_ID)
 
         self.settings = GatorSettings()
         self.apply_color_scheme()

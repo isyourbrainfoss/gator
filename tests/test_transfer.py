@@ -500,3 +500,50 @@ def test_gui_receive_keeps_yes_and_ignore_stdin():
     assert "--yes" in args
     assert "--ignore-stdin" in args
     assert "--code" not in args
+
+
+def test_extract_received_text_keeps_status_lookalike_lines():
+    from gator.transfer import extract_received_text
+
+    payload = "50% off | today\nwaiting for you\n\nhashing is fun"
+    raw = (
+        "connecting...\rwaiting for file list...   \r  \r"
+        f"Receiving text message ({len(payload.encode())} B)  \n\n"
+        "Receiving (172.30.0.2<-127.0.0.1)\n"
+        f"{payload}\n"
+        "A newer croc version is available: v11.5.5 (current: v11.5.4).\n"
+        "Run: croc update\n"
+    )
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_utf8_byte_size():
+    from gator.transfer import extract_received_text
+
+    payload = "héllo ✓"
+    raw = (
+        f"Receiving text message ({len(payload.encode())} B)\n"
+        f"Receiving (a<-b)\n{payload}\n"
+    )
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_large_message_strips_trailer():
+    from gator.transfer import extract_received_text
+
+    payload = "x" * 2000 + "\nend"
+    raw = (
+        "Receiving text message (2.0 kB)\nReceiving (a<-b)\n"
+        f"{payload}\nA newer croc version is available: v9\nRun: croc update\n"
+    )
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_none_without_header():
+    from gator.transfer import extract_received_text
+
+    assert extract_received_text("Receiving 'a.txt' (3 B)\n") is None
+
+
+def test_receiving_text_message_is_status_line():
+    assert is_croc_status_line("Receiving text message (17 B)")

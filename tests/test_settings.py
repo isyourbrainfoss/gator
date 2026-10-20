@@ -17,7 +17,16 @@ def test_defaults_present():
     assert S.DEFAULTS["curve"] == ""
     assert S.DEFAULTS["color_scheme"] == "default"
     assert S.DEFAULTS["rename"] is False
-    assert S.APP_VERSION == "1.6.1"
+
+
+def test_app_version_matches_project_metadata():
+    """About dialog version must track meson.build / pyproject.toml."""
+    import re
+
+    root = Path(__file__).resolve().parents[1]
+    meson = re.search(r"version:\s*'([^']+)'", (root / "meson.build").read_text()).group(1)
+    pyproj = re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
+    assert S.APP_VERSION == meson == pyproj
 
 
 def test_validate_clamps_port():

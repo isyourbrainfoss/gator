@@ -126,7 +126,8 @@ def test_build_global_args_with_overrides():
     assert "--debug" in args
     assert "--relay" in args
     assert "1.2.3.4:9009" in args
-    assert "--pass" in args and "s3cr3t" in args
+    # relay password is passed via CROC_PASS, never argv (visible in ps)
+    assert "--pass" not in args and "s3cr3t" not in args
     # port not in global
     assert "--port" not in args
 
@@ -547,3 +548,32 @@ def test_extract_received_text_none_without_header():
 
 def test_receiving_text_message_is_status_line():
     assert is_croc_status_line("Receiving text message (17 B)")
+
+
+def test_relay_env_carries_pass_out_of_argv():
+    from gator.transfer import relay_env
+
+    assert relay_env({"pass": " s3cr3t "}) == {"CROC_PASS": "s3cr3t"}
+    assert relay_env({"pass": ""}) == {}
+    assert relay_env({}) == {}
+
+
+def test_extract_received_text_without_peer_line_keeps_all_lines():
+    from gator.transfer import extract_received_text
+
+    # No "Receiving (a<-b)" peer line after the header: a payload line that
+    # merely looks like one must not swallow the lines before it.
+    payload = "line1\nReceiving (evil)\nline3"
+    raw = f"Receiving text message ({len(payload.encode())} B)\n{payload}\n"
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_peer_line_after_blank_line():
+    from gator.transfer import extract_received_text
+
+    payload = "Receiving (looks like peer)\nhello"
+    raw = (
+        f"Receiving text message ({len(payload.encode())} B)  \n\n"
+        f"Receiving (172.30.0.2<-::1)\n{payload}\n"
+    )
+    assert extract_received_text(raw) == payload

@@ -58,6 +58,7 @@ _CROC_STATUS_PREFIXES = (
     "receiving '",
     'receiving "',
     "receiving file (",
+    "receiving text message",
     "sending (<-",
     "sending (->",
     "sending (",
@@ -102,6 +103,17 @@ _CROC_STATUS_SUBSTRINGS = (
     "getcroc.com/?code=",
 )
 _REDACT_FLAGS = {"--pass", "--code", "--text"}
+_TEXT_HEADER_RE = re.compile(
+    r"Receiving text message \((\d+(?:\.\d+)?) ([kMGTPE]?)B\)[^\n]*\n"
+)
+# The peer line croc prints right after the text header (blank lines allowed).
+# Anchored with ``match`` at the header end so a payload line that merely
+# looks like ``Receiving (x)`` is never treated as the peer line.
+_PEER_LINE_RE = re.compile(r"(?:[^\S\n]*\n)*Receiving \([^)\n]*\)[^\S\n]*\n")
+_TEXT_TRAILER_RE = re.compile(
+    r"\n?(?:A newer croc version is available[^\n]*\n?(?:Run: croc update\n?)?)\s*$"
+)
+_MAX_RAW_OUTPUT = 4 * 1024 * 1024
 _MAX_LOG_LINES = 500
 _PROGRESS_UI_MS = 100
 
@@ -184,6 +196,30 @@ def is_croc_status_line(line: str) -> bool:
     if low.startswith("sending ") and "code is:" not in low:
         return True
     return False
+
+
+def extract_received_text(raw: str) -> str | None:
+    """Return the text payload from raw croc receive stdout, or None.
+
+    croc prints ``Receiving text message (N B)``, then the peer line
+    ``Receiving (a<-b)``, then the message bytes verbatim. Line-based
+    status filtering would drop payload lines that merely look like croc
+    status (``50% off``, ``waiting for you``), so slice the raw output.
+    """
+    text = strip_ansi(raw)
+    header = _TEXT_HEADER_RE.search(text)
+    if header is None:
+        return None
+    peer = _PEER_LINE_RE.match(text, header.end())
+    start = peer.end() if peer is not None else header.end()
+    body = text[start:]
+    if not header.group(2):
+        size = int(float(header.group(1)))
+        encoded = body.encode("utf-8")
+        if len(encoded) >= size:
+            return encoded[:size].decode("utf-8", errors="replace")
+    body = _TEXT_TRAILER_RE.sub("", body)
+    return body.rstrip("\n")
 
 
 def is_receive_file_indicator(line: str) -> bool:
@@ -360,6 +396,12 @@ def build_receive_args(
     )
 
 
+def relay_env(settings: dict[str, Any]) -> dict[str, str]:
+    """Env for the croc relay password (``CROC_PASS``), kept out of argv."""
+    relay_pass = (settings.get("pass") or "").strip()
+    return {"CROC_PASS": relay_pass} if relay_pass else {}
+
+
 def receive_env_for_code(code: str) -> dict[str, str]:
     """Env vars croc v10+ expects for non-TTY receive (no positional code)."""
     return {"CROC_SECRET": normalize_croc_code(code)}
@@ -444,9 +486,8 @@ def build_global_args(
     relay6 = settings.get("relay6", "").strip()
     if relay6:
         args += ["--relay6", relay6]
-    relay_pass = settings.get("pass", "").strip()
-    if relay_pass:
-        args += ["--pass", relay_pass]
+    # The relay password goes in CROC_PASS (see relay_env), not argv, so it
+    # is not visible to other local users via ps / /proc/<pid>/cmdline.
     if settings.get("internal_dns", False):
         args += ["--internal-dns"]
     if settings.get("debug", False):
@@ -573,14 +614,17 @@ class CrocTransfer:
     ) -> None:
         flags = Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE
         launcher = Gio.SubprocessLauncher.new(flags)
+        # Never let an inherited CROC_SECRET / CROC_PASS leak into a run
+        # that did not ask for one; set only what this transfer needs.
+        for key in ("CROC_SECRET", "CROC_PASS"):
+            if env is None or key not in env:
+                try:
+                    launcher.unsetenv(key)
+                except (AttributeError, GLib.Error):
+                    pass
         if env is not None:
             for key, value in env.items():
                 launcher.setenv(key, value, True)
-        else:
-            try:
-                launcher.unsetenv("CROC_SECRET")
-            except (AttributeError, GLib.Error):
-                pass
         if cwd is not None:
             launcher.set_cwd(cwd)
         # Close stdin so croc never waits on a TTY prompt (GLib has no STDIN_NULL).
@@ -855,7 +899,8 @@ class CrocSendTransfer(CrocTransfer):
         self._on_log(f"Running: {format_argv_for_log(args)}")
         self._on_log("Starting croc send")
         self._temp_cwd = tempfile.mkdtemp(prefix="gator-croc-")
-        self._spawn(args, env=self.secret_env(), cwd=self._temp_cwd)
+        env = {**relay_env(self._settings), **(self.secret_env() or {})}
+        self._spawn(args, env=env or None, cwd=self._temp_cwd)
         self._maybe_emit_known_code()
 
 
@@ -886,6 +931,7 @@ class CrocReceiveTransfer(CrocTransfer):
         self._on_text_received = on_text_received
         self._on_transfer_complete = on_transfer_complete
         self._before: set[str] = set()
+        self._raw_output = ""
         self._saw_file_indicator = False
         self.received_files = False
         self.received_text = False
@@ -893,12 +939,18 @@ class CrocReceiveTransfer(CrocTransfer):
     def _is_likely_content_line(self, line: str) -> bool:
         return not is_croc_status_line(line)
 
+    def _consume_output(self, chunk: str) -> None:
+        if len(self._raw_output) < _MAX_RAW_OUTPUT:
+            self._raw_output += chunk
+        super()._consume_output(chunk)
+
     def _handle_line(self, line: str, *, complete: bool) -> None:
         super()._handle_line(line, complete=complete)
         if is_receive_file_indicator(line):
             self._saw_file_indicator = True
 
     def _launch(self) -> None:
+        self._raw_output = ""
         try:
             os.makedirs(self._save_dir, exist_ok=True)
         except OSError as e:
@@ -927,7 +979,8 @@ class CrocReceiveTransfer(CrocTransfer):
         )
         self._on_log(f"Running: CROC_SECRET=*** {format_argv_for_log(args)}")
         self._on_log("Receiving transfer")
-        self._spawn(args, env=receive_env_for_code(code), cwd=self._save_dir)
+        env = {**relay_env(self._settings), **receive_env_for_code(code)}
+        self._spawn(args, env=env, cwd=self._save_dir)
 
     def _post_process(self) -> None:
         if self.canceled or not self.success:
@@ -946,6 +999,11 @@ class CrocReceiveTransfer(CrocTransfer):
         if self._check_temp_text_file():
             text_delivered = True
 
+        if not text_delivered and not received_files and not self._saw_file_indicator:
+            payload = extract_received_text(self._raw_output)
+            if payload is not None and payload.strip():
+                self._on_text_received(payload)
+                text_delivered = True
         if not text_delivered and not received_files and not self._saw_file_indicator:
             text_lines = [ln for ln in self._lines if self._is_likely_content_line(ln)]
             text = "\n".join(text_lines).strip()

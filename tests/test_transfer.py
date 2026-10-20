@@ -126,7 +126,8 @@ def test_build_global_args_with_overrides():
     assert "--debug" in args
     assert "--relay" in args
     assert "1.2.3.4:9009" in args
-    assert "--pass" in args and "s3cr3t" in args
+    # relay password is passed via CROC_PASS, never argv (visible in ps)
+    assert "--pass" not in args and "s3cr3t" not in args
     # port not in global
     assert "--port" not in args
 
@@ -500,3 +501,79 @@ def test_gui_receive_keeps_yes_and_ignore_stdin():
     assert "--yes" in args
     assert "--ignore-stdin" in args
     assert "--code" not in args
+
+
+def test_extract_received_text_keeps_status_lookalike_lines():
+    from gator.transfer import extract_received_text
+
+    payload = "50% off | today\nwaiting for you\n\nhashing is fun"
+    raw = (
+        "connecting...\rwaiting for file list...   \r  \r"
+        f"Receiving text message ({len(payload.encode())} B)  \n\n"
+        "Receiving (172.30.0.2<-127.0.0.1)\n"
+        f"{payload}\n"
+        "A newer croc version is available: v11.5.5 (current: v11.5.4).\n"
+        "Run: croc update\n"
+    )
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_utf8_byte_size():
+    from gator.transfer import extract_received_text
+
+    payload = "héllo ✓"
+    raw = (
+        f"Receiving text message ({len(payload.encode())} B)\n"
+        f"Receiving (a<-b)\n{payload}\n"
+    )
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_large_message_strips_trailer():
+    from gator.transfer import extract_received_text
+
+    payload = "x" * 2000 + "\nend"
+    raw = (
+        "Receiving text message (2.0 kB)\nReceiving (a<-b)\n"
+        f"{payload}\nA newer croc version is available: v9\nRun: croc update\n"
+    )
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_none_without_header():
+    from gator.transfer import extract_received_text
+
+    assert extract_received_text("Receiving 'a.txt' (3 B)\n") is None
+
+
+def test_receiving_text_message_is_status_line():
+    assert is_croc_status_line("Receiving text message (17 B)")
+
+
+def test_relay_env_carries_pass_out_of_argv():
+    from gator.transfer import relay_env
+
+    assert relay_env({"pass": " s3cr3t "}) == {"CROC_PASS": "s3cr3t"}
+    assert relay_env({"pass": ""}) == {}
+    assert relay_env({}) == {}
+
+
+def test_extract_received_text_without_peer_line_keeps_all_lines():
+    from gator.transfer import extract_received_text
+
+    # No "Receiving (a<-b)" peer line after the header: a payload line that
+    # merely looks like one must not swallow the lines before it.
+    payload = "line1\nReceiving (evil)\nline3"
+    raw = f"Receiving text message ({len(payload.encode())} B)\n{payload}\n"
+    assert extract_received_text(raw) == payload
+
+
+def test_extract_received_text_peer_line_after_blank_line():
+    from gator.transfer import extract_received_text
+
+    payload = "Receiving (looks like peer)\nhello"
+    raw = (
+        f"Receiving text message ({len(payload.encode())} B)  \n\n"
+        f"Receiving (172.30.0.2<-::1)\n{payload}\n"
+    )
+    assert extract_received_text(raw) == payload

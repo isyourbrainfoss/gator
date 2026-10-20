@@ -62,6 +62,15 @@
   <content_rating type="oars-1.1" />
   
   <releases>
+    <release version="1.6.3" date="2026-10-20">
+      <description>
+        <p>Bugfix release:</p>
+        <ul>
+          <li>Fixed a crash on startup (set_default_icon_name called on the Application)</li>
+          <li>Pressing Enter in the receive code field starts receiving again</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.2" date="2026-10-07">
       <description>
         <p>Bundled croc 11.5.4 (bugfixes and dependency upgrades):</p>

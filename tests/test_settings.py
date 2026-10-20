@@ -24,8 +24,12 @@ def test_app_version_matches_project_metadata():
     import re
 
     root = Path(__file__).resolve().parents[1]
-    meson = re.search(r"version:\s*'([^']+)'", (root / "meson.build").read_text()).group(1)
-    pyproj = re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
+    meson = re.search(
+        r"version:\s*'([^']+)'", (root / "meson.build").read_text()
+    ).group(1)
+    pyproj = re.search(
+        r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M
+    ).group(1)
     assert S.APP_VERSION == meson == pyproj
 
 

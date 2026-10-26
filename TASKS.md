@@ -12,7 +12,7 @@ Core app, Flatpak, and CI are in place. **v1.6.2** bundles croc 11.5.4 and parse
 - Modular GTK4/libadwaita app (`app`, `window`, pages, `transfer`, `settings`, `preferences`)
 - `Gio.Subprocess` transfers with `\r`/`\n` progress parsing
 - GSettings + JSON fallback; empty croc defaults + legacy relay migration
-- Flatpak bundles croc **v11.5.4**; GitHub Pages repo (x86_64 + aarch64)
+- Flatpak bundles croc **v11.5.5**; GitHub Pages repo (x86_64 + aarch64)
 - Meson, desktop, metainfo, CI (black/ruff/mypy/pytest)
 - Unit tests: settings, transfer, qr, theme
 
@@ -43,6 +43,10 @@ Core app, Flatpak, and CI are in place. **v1.6.2** bundles croc 11.5.4 and parse
 - [x] Keyboard shortcuts, desktop notifications when unfocused, a11y `update_property`
 - [x] Preferences: editable rows, reset confirmation, hash `highway`/`xxhash`
 - [x] Version strings synced to 1.6.0
+
+### Unreleased — croc 11.5.5
+- [x] Bundled croc 11.5.4 → **11.5.5** (stored-upload/relay fixes, per-source handshake limits, deps; no send/receive CLI or output changes)
+- [x] CI Linux croc install pin 11.5.4 → **11.5.5**
 
 ### v1.6.2 — croc 11.5.4
 - [x] Bundled croc 11.5.3 → **11.5.4** (stored-transfer SOCKS5/connect, int64 chunks, stdout/zip overwrite safety, deps)
@@ -98,7 +102,7 @@ Debug: `GATOR_LOG=1 flatpak run org.gator.Gator`
 |------|-----------|
 | Honest outcomes | Invalid code / failed croc never shows success checkmarks or “Transfer finished” |
 | Custom codes | Prefs custom code ≥ 6 chars starts a send; receiver uses the same phrase |
-| croc 11.5.4 | `flatpak run --command=croc org.gator.Gator --version` reports 11.5.4 |
+| croc 11.5.5 | `flatpak run --command=croc org.gator.Gator --version` reports 11.5.5 |
 | 11.5 parser | Send instructions, progress bars, and receive status lines parse without a `Code is:` line |
 | Secrets | Shell log never contains `--pass` or `--text` values |
 | Temp files | `pytest tests/test_transfer.py` leaves no `croc-stdin-*` in the repo root |

@@ -61,8 +61,8 @@ modules:
         go build -o $FLATPAK_DEST/bin/croc .
     sources:
       - type: archive
-        url: https://github.com/schollz/croc/archive/refs/tags/v11.5.5.tar.gz
-        sha256: 1263e430cd62654438c9724072b7d5587e9930ca0e687d65b3dd8917ec0141df
+        url: https://github.com/schollz/croc/archive/refs/tags/v11.6.2.tar.gz
+        sha256: 374efef9a597c8f9fb95f83bbef7f8a031217f3a6106036eedeb1790509160da
         strip-components: 1
 
   # --- zbar (for pyzbar QR scanning on receive) -----------------------------

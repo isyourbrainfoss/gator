@@ -577,3 +577,35 @@ def test_extract_received_text_peer_line_after_blank_line():
         f"Receiving (172.30.0.2<-::1)\n{payload}\n"
     )
     assert extract_received_text(raw) == payload
+
+
+def test_decode_chunk_keeps_utf8_split_across_reads():
+    t = CrocReceiveTransfer(
+        settings={},
+        code="1234-abc-def",
+        save_dir="/tmp",
+        on_log=lambda _l: None,
+        on_text_received=lambda _t: None,
+        on_transfer_complete=lambda: None,
+        on_finished=lambda: None,
+    )
+    raw = "blåbærsyltetøy".encode("utf-8")
+    cut = raw.index("å".encode("utf-8")) + 1  # split inside the 2-byte "å"
+    out = t._decode_chunk(raw[:cut]) + t._decode_chunk(raw[cut:])
+    out += t._decode_chunk(b"", final=True)
+    assert out == "blåbærsyltetøy"
+    assert "\ufffd" not in out
+
+
+def test_decode_chunk_flushes_truncated_sequence_on_eof():
+    t = CrocSendTransfer(
+        settings={},
+        files=[],
+        excluded=[],
+        text="x",
+        on_log=lambda _l: None,
+        on_code=lambda _c: None,
+        on_finished=lambda: None,
+    )
+    assert t._decode_chunk(b"ok\xc3") == "ok"
+    assert t._decode_chunk(b"", final=True) == "\ufffd"

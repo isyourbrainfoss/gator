@@ -331,17 +331,33 @@ class GatorSettings(dict):
                 # Only persist keys that differ from defaults or are user set
                 to_save = {k: v for k, v in self.items() if v != DEFAULTS.get(k)}
                 self._json_file.parent.mkdir(parents=True, exist_ok=True)
+                # Write to a private temp file and rename over the old one so a
+                # crash or full disk mid-write cannot leave truncated JSON
+                # (which would silently reset every preference on next start).
+                tmp_path = self._json_file.with_name(
+                    f".{self._json_file.name}.{os.getpid()}.tmp"
+                )
                 fd = os.open(
-                    self._json_file,
+                    tmp_path,
                     os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
                     0o600,
                 )
                 try:
-                    os.fchmod(fd, 0o600)
-                except OSError:
-                    pass
-                with os.fdopen(fd, "w") as f:
-                    json.dump(to_save, f, indent=2)
+                    try:
+                        os.fchmod(fd, 0o600)
+                    except OSError:
+                        pass
+                    with os.fdopen(fd, "w") as f:
+                        json.dump(to_save, f, indent=2)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp_path, self._json_file)
+                except BaseException:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                    raise
             except OSError as e:
                 logger.error("Could not save JSON settings: %s", e)
 

@@ -589,8 +589,8 @@ def test_decode_chunk_keeps_utf8_split_across_reads():
         on_transfer_complete=lambda: None,
         on_finished=lambda: None,
     )
-    raw = "blåbærsyltetøy".encode("utf-8")
-    cut = raw.index("å".encode("utf-8")) + 1  # split inside the 2-byte "å"
+    raw = "blåbærsyltetøy".encode()
+    cut = raw.index("å".encode()) + 1  # split inside the 2-byte "å"
     out = t._decode_chunk(raw[:cut]) + t._decode_chunk(raw[cut:])
     out += t._decode_chunk(b"", final=True)
     assert out == "blåbærsyltetøy"

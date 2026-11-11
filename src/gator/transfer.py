@@ -5,6 +5,7 @@ All callbacks run on the GLib main loop via async I/O (no worker threads).
 
 from __future__ import annotations
 
+import codecs
 import logging
 import os
 import re
@@ -553,6 +554,7 @@ class CrocTransfer:
         self._waiting_exit = False
         self._lines: list[str] = []
         self._read_buf = ""
+        self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self._on_log = on_log
         self._on_finished = on_finished
         self._on_progress = on_progress
@@ -573,6 +575,7 @@ class CrocTransfer:
         self._waiting_exit = False
         self._lines = []
         self._read_buf = ""
+        self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self._cancellable = Gio.Cancellable()
         try:
             self._launch()
@@ -672,12 +675,23 @@ class CrocTransfer:
         if self._finished:
             return
         if data.get_size() == 0:
+            tail = self._decode_chunk(b"", final=True)
+            if tail:
+                self._consume_output(tail)
             self._flush_read_buffer()
             self._wait_for_exit()
             return
-        chunk = bytes(data.get_data()).decode("utf-8", errors="replace")
-        self._consume_output(chunk)
+        # Pipe reads can split a multi-byte UTF-8 sequence (e.g. "æøå" in a
+        # received text or file name); decode incrementally so the split
+        # character is not turned into two U+FFFD replacement characters.
+        chunk = self._decode_chunk(bytes(data.get_data()))
+        if chunk:
+            self._consume_output(chunk)
         self._read_chunk()
+
+    def _decode_chunk(self, data: bytes, *, final: bool = False) -> str:
+        """Decode a raw pipe chunk, carrying split UTF-8 sequences over."""
+        return self._decoder.decode(data, final=final)
 
     def _consume_output(self, chunk: str) -> None:
         self._read_buf, segments = split_croc_output(chunk, self._read_buf)

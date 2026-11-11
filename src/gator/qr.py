@@ -89,18 +89,24 @@ def _scan_variants(image: Any) -> str | None:
     except Exception:
         base = image
 
-    variants: list[Any] = []
     rgb = base.convert("RGB")
-    gray = base.convert("L")
-    variants.extend([rgb, gray, ImageOps.invert(gray)])
-    try:
-        variants.append(ImageOps.autocontrast(gray))
-    except Exception:
-        pass
-    try:
-        variants.append(ImageEnhance.Contrast(gray).enhance(2.0))
-    except Exception:
-        pass
+
+    def variants() -> Any:
+        # Build variants lazily: a 12 MP photo is ~36 MB as RGB plus ~12 MB per
+        # grayscale copy, so materialising all five up front multiplied peak
+        # memory for no benefit when the first pass already finds the code.
+        yield rgb
+        gray = base.convert("L")
+        yield gray
+        yield ImageOps.invert(gray)
+        try:
+            yield ImageOps.autocontrast(gray)
+        except Exception:
+            pass
+        try:
+            yield ImageEnhance.Contrast(gray).enhance(2.0)
+        except Exception:
+            pass
 
     width, height = rgb.size
     long_edge = max(width, height)
@@ -110,7 +116,7 @@ def _scan_variants(image: Any) -> str | None:
     if long_edge < 400:
         scales.append(400 / long_edge)
 
-    for variant in variants:
+    for variant in variants():
         for scale in scales:
             candidate = variant
             if scale != 1.0:

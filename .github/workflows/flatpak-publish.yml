@@ -120,6 +120,11 @@ jobs:
           cp -a repo/. site/
           cp flatpak/gator.flatpakrepo site/gator.flatpakrepo
           touch site/.nojekyll
+          # Landing page (fixes the / 404). Keep ostree at the site root so
+          # org.gator.Gator.flatpakref and gator.flatpakrepo URLs stay valid.
+          cp docs/pages/index.html site/index.html
+          cp docs/pages/style.css site/style.css
+          cp -a docs/pages/images site/images
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

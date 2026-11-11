@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Gator 1.6.3 (GTK)</title>
+  <link rel="stylesheet" href="style.css">
+  <style>:root { --accent: #3584e4; --accent-ink: #061018; }</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <p class="kicker">GTK4 / Libadwaita · Linux</p>
+        <h1>Gator</h1>
+        <p class="lede">A GTK front end for croc: send files, folders, and text with end-to-end encryption, a share code, and a QR code. Built for Linux desktop and Linux phones.</p>
+        <p class="meta">Version 1.6.3 · Flatpak includes croc</p>
+        <div class="actions">
+      <a class="button" href="#install">Install</a>
+      <a class="button secondary" href="https://github.com/isyourbrainfoss/gator">Source on GitHub</a>
+      <a class="button secondary" href="https://github.com/isyourbrainfoss/gator-flutter">Android / Flutter port</a>
+        </div>
+      </div>
+      <p class="disclaimer">Personal, experimental software. Nothing here is a finished product, and nothing was necessarily written or reviewed by a human unless it says so. Use it at your own risk.</p>
+    </header>
+    <nav class="toc">
+      <a href="#screenshots">Screenshots</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/isyourbrainfoss/gator">github.com/isyourbrainfoss/gator</a>
+    </nav>
+    <section id="screenshots">
+      <h2>Screenshots</h2>
+      <ul class="shots">
+        <li><figure class="shot wide"><a href="images/send-qr-dark.jpg"><img src="images/send-qr-dark.jpg" alt="GTK Gator waiting for a receiver, with a QR code and a transfer code."></a><figcaption>Send with QR (dark)</figcaption></figure></li><li><figure class="shot wide"><a href="images/send-files-light.jpg"><img src="images/send-files-light.jpg" alt="Three files queued in the light theme."></a><figcaption>Send list (light)</figcaption></figure></li><li><figure class="shot wide"><a href="images/receive-dark.jpg"><img src="images/receive-dark.jpg" alt="The receive view, ready for a share code."></a><figcaption>Receive (dark)</figcaption></figure></li><li><figure class="shot phone"><a href="images/send-qr-narrow.jpg"><img src="images/send-qr-narrow.jpg" alt="The same send-and-QR flow in a tall, phone-sized window."></a><figcaption>Narrow window</figcaption></figure></li>
+      </ul>
+    </section>
+    <section id="install">
+      <h2>Install</h2>
+      
+    <div class="grid-2">
+      <div class="card"><h3>Linux (Flatpak)</h3>
+<p>Current app version in the tree: <strong>1.6.3</strong>. Flatpak currently bundles croc 11.6.5 — no separate croc install is needed. Builds are published for x86_64 and aarch64.</p><p>The easiest install is the <code>.flatpakref</code> on <code>master</code>:</p><pre><code>flatpak remote-add --user --if-not-exists flathub \
+  https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user --from \
+  https://raw.githubusercontent.com/isyourbrainfoss/gator/master/org.gator.Gator.flatpakref
+flatpak run org.gator.Gator</code></pre><p>Or add the Pages remote:</p><pre><code>flatpak remote-add --user --if-not-exists --no-gpg-verify --from gator \
+  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo
+flatpak install --user gator org.gator.Gator</code></pre></div>
+      <div class="card"><h3>From source (development)</h3>
+<p>Needs croc on <code>PATH</code>, plus Python 3.10+, PyGObject, GTK 4, and libadwaita 1.7+.</p><pre><code>git clone https://github.com/isyourbrainfoss/gator.git
+cd gator
+pip install -e '.[qr,dev]'
+gator</code></pre><p>Android users want the Flutter port: <a href='https://github.com/isyourbrainfoss/gator-flutter'>gator-flutter</a>.</p></div>
+    </div>
+    
+    </section>
+    
+<footer>
+      <p>Source: <a href="https://github.com/isyourbrainfoss/gator">github.com/isyourbrainfoss/gator</a>. This is a personal project page, not a store listing.</p>
+    </footer>
+  </div>
+</body>
+</html>

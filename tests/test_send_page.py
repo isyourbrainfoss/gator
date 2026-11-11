@@ -1,5 +1,6 @@
 """Send page: secondary actions stay out of the way until there is a selection."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -10,6 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 @pytest.fixture
 def send_page(tmp_path, monkeypatch):
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        # Building GTK widgets without a display segfaults (headless CI).
+        pytest.skip("no display for GTK widgets")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("HOME", str(tmp_path))
     try:

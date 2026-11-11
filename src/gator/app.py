@@ -871,9 +871,13 @@ class GatorApp(Adw.Application):
             p = f.get_path()
             if not p:
                 continue
-            info = Gio.File.new_for_path(p).query_info(
-                "standard::content-type", Gio.FileQueryInfoFlags.NONE, None
-            )
+            try:
+                info = Gio.File.new_for_path(p).query_info(
+                    "standard::content-type", Gio.FileQueryInfoFlags.NONE, None
+                )
+            except GLib.Error as e:
+                logger.warning("Could not inspect dropped file %s: %s", p, e.message)
+                continue
             ctype = info.get_content_type() or ""
             if not ctype.startswith("image/"):
                 continue

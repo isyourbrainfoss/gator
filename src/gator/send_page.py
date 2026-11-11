@@ -161,11 +161,19 @@ class SendPage(Gtk.Box):
         exclude_pop.set_child(exclude_vbox)
         self.exclude_btn.set_popover(exclude_pop)
         self.exclude_btn.set_hexpand(True)
+        self.exclude_btn.set_tooltip_text(
+            _("Leave out files or folders from what you added")
+        )
+        # Exclude and Clear All only mean something once there is a selection;
+        # showing them on the empty page made "Exclude" look like a peer of
+        # "Add". refresh_file_list() reveals them.
+        self.exclude_btn.set_visible(False)
         buttons_row.append(self.exclude_btn)
 
         self.clear_btn = Gtk.Button()
         self.clear_btn.add_css_class("flat")
         self.clear_btn.set_sensitive(False)
+        self.clear_btn.set_visible(False)
         clear_h = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         clear_h.append(Gtk.Image.new_from_icon_name("edit-clear-symbolic"))
         clear_h.append(Gtk.Label(label=_("Clear All")))
@@ -214,6 +222,7 @@ class SendPage(Gtk.Box):
         send_btn_box.append(Gtk.Label(label=_("Start Transfer")))
         self.send_start_btn.set_child(send_btn_box)
         self.send_start_btn.set_sensitive(False)
+        self.send_start_btn.set_tooltip_text(_("Add something to send first"))
         self.send_start_btn.connect("clicked", lambda *_: self.emit("start-send"))
         self.send_idle_box.append(self.send_start_btn)
 
@@ -589,6 +598,11 @@ class SendPage(Gtk.Box):
             self.files_listbox.append(row)
         has_payload = bool(selected) or bool(send_text)
         self.send_start_btn.set_sensitive(has_payload and not self._transfer_active)
-        self.clear_btn.set_sensitive(
-            (has_payload or bool(excluded)) and not self._transfer_active
+        self.send_start_btn.set_tooltip_text(
+            None if has_payload else _("Add something to send first")
         )
+        has_any = has_payload or bool(excluded)
+        self.clear_btn.set_visible(has_any)
+        self.clear_btn.set_sensitive(has_any and not self._transfer_active)
+        # Exclusions apply to added files/folders, not to a text payload.
+        self.exclude_btn.set_visible(bool(selected) or bool(excluded))

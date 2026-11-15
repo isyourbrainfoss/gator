@@ -1,0 +1,32 @@
+# Tell the shared, signed Flatpak repo (isyourbrainfoss/flatpak) that a new Gator release exists.
+# The shared repo builds org.gator.Gator from the newest release tag for x86_64 and aarch64,
+# signs it and publishes it on branch "stable" at https://isyourbrainfoss.github.io/flatpak/.
+# Needs the FLATPAK_DISPATCH_TOKEN secret (fine-grained PAT for isyourbrainfoss/flatpak with
+# Contents: read and write). Without it this job is a no-op and the weekly run picks the release up.
+name: Notify Flatpak repo
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: repository_dispatch to isyourbrainfoss/flatpak
+        env:
+          DISPATCH_TOKEN: ${{ secrets.FLATPAK_DISPATCH_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "::notice::FLATPAK_DISPATCH_TOKEN not set; skipping (the shared repo checks for new releases weekly)."
+            exit 0
+          fi
+          GH_TOKEN="$DISPATCH_TOKEN" gh api repos/isyourbrainfoss/flatpak/dispatches \
+            -f event_type=app-updated \
+            -F 'client_payload[app]=org.gator.Gator' \
+            -F "client_payload[tag]=$TAG"

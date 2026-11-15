@@ -10,6 +10,7 @@
 </head>
 <body>
   <div class="wrap">
+    <p class="disclaimer" style="border-left:4px solid #e5a50a;padding-left:.8rem"><strong>Moved:</strong> Gator is now published in the signed <a href="https://isyourbrainfoss.github.io/flatpak/">isyourbrainfoss Flatpak repository</a>. This unsigned repository keeps getting updates until 2027-01-15. <a href="#install">How to switch</a>.</p>
     <header class="hero">
       <div>
         <p class="kicker">GTK4 / Libadwaita · Linux</p>
@@ -40,13 +41,13 @@
       
     <div class="grid-2">
       <div class="card"><h3>Linux (Flatpak)</h3>
-<p>Current app version in the tree: <strong>1.6.3</strong>. Flatpak currently bundles croc 11.6.5 — no separate croc install is needed. Builds are published for x86_64 and aarch64.</p><p>The easiest install is the <code>.flatpakref</code> on <code>master</code>:</p><pre><code>flatpak remote-add --user --if-not-exists flathub \
-  https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user --from \
-  https://raw.githubusercontent.com/isyourbrainfoss/gator/master/org.gator.Gator.flatpakref
-flatpak run org.gator.Gator</code></pre><p>Or add the Pages remote:</p><pre><code>flatpak remote-add --user --if-not-exists --no-gpg-verify --from gator \
-  https://isyourbrainfoss.github.io/gator/gator.flatpakrepo
-flatpak install --user gator org.gator.Gator</code></pre></div>
+<p>Current app version in the tree: <strong>1.6.3</strong>. Flatpak currently bundles croc 11.6.5 — no separate croc install is needed. Builds are published for x86_64 and aarch64.</p><p>Install from the signed <a href="https://isyourbrainfoss.github.io/flatpak/">isyourbrainfoss Flatpak repository</a> (branch <code>stable</code>):</p><pre><code>flatpak remote-add --user --if-not-exists isyourbrainfoss \
+  https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+flatpak install --user isyourbrainfoss org.gator.Gator
+flatpak run org.gator.Gator</code></pre><p>Already installed from this old unsigned repository (remote <code>gator</code>)? It keeps working until 2027-01-15. Switch with:</p><pre><code>flatpak remote-add --user --if-not-exists isyourbrainfoss \
+  https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+flatpak install --user --reinstall isyourbrainfoss org.gator.Gator
+flatpak remote-delete --user gator</code></pre></div>
       <div class="card"><h3>From source (development)</h3>
 <p>Needs croc on <code>PATH</code>, plus Python 3.10+, PyGObject, GTK 4, and libadwaita 1.7+.</p><pre><code>git clone https://github.com/isyourbrainfoss/gator.git
 cd gator

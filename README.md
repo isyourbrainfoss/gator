@@ -9,21 +9,32 @@ GTK4/Libadwaita app for [croc](https://github.com/schollz/croc) — send files, 
 
 ## Install (Flatpak)
 
-Requires [Flatpak](https://flatpak.org/) and the Flathub remote (for the GNOME runtime):
+Gator is published in the signed [isyourbrainfoss Flatpak repository](https://isyourbrainfoss.github.io/flatpak/)
+for **x86_64** and **aarch64** (branch `stable`). Runtimes come from Flathub automatically.
 
 ```bash
-flatpak remote-add --user --if-not-exists flathub \
-  https://dl.flathub.org/repo/flathub.flatpakrepo
-
-flatpak install --user --from \
-  https://raw.githubusercontent.com/isyourbrainfoss/gator/master/org.gator.Gator.flatpakref
-
+flatpak remote-add --user --if-not-exists isyourbrainfoss \
+  https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+flatpak install --user isyourbrainfoss org.gator.Gator
 flatpak run org.gator.Gator
 ```
 
-Updates: `flatpak update --user org.gator.Gator`
+Or in one step: `flatpak install --user --from https://isyourbrainfoss.github.io/flatpak/org.gator.Gator.flatpakref`
 
-Builds are published for **x86_64** and **aarch64** from [GitHub Pages](https://isyourbrainfoss.github.io/gator/).
+Updates: `flatpak update`, or GNOME Software / KDE Discover / Bazaar.
+
+### Moving from the old unsigned repo
+
+The old repository at https://isyourbrainfoss.github.io/gator/ (remote `gator`, `--no-gpg-verify`,
+branch `master`) keeps getting builds until **2027-01-15**, then it stops. Switch now (your settings
+in `~/.var/app/org.gator.Gator` are kept):
+
+```bash
+flatpak remote-add --user --if-not-exists isyourbrainfoss \
+  https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+flatpak install --user --reinstall isyourbrainfoss org.gator.Gator
+flatpak remote-delete --user gator
+```
 
 ## Run from source
 

@@ -2,7 +2,12 @@
 # Builds x86_64 and aarch64 into one ostree repo so ARM devices (e.g. OnePlus 6
 # on postmarketOS) install the correct architecture automatically.
 #
-# After the workflow runs, install with:
+# DEPRECATED, transition only: Gator now ships from the signed shared repo
+# https://isyourbrainfoss.github.io/flatpak/ (branch "stable", see notify-flatpak-repo.yml).
+# This unsigned repo (branch "master") keeps working for existing installs until 2027-01-15;
+# after that, replace this workflow with a static page that has the migration commands.
+#
+# Old install commands (kept for reference):
 #   flatpak remote-add --user --if-not-exists --no-gpg-verify --from gator \
 #     https://isyourbrainfoss.github.io/gator/gator.flatpakrepo
 #   flatpak install --user gator org.gator.Gator

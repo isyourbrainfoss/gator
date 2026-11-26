@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,18 @@ APP_NAME = "Gator"
 APP_VERSION = "1.6.4"
 
 CROC_BINARY = "croc"
+# Flatpak archive pin. About prefers the running `croc --version` and
+# falls back to this when the binary is missing or the probe fails.
+BUNDLED_CROC_VERSION = "11.6.6"
+
+# Bare version from the last successful `croc --version` (for example "11.6.6").
+_runtime_croc_version: str | None = None
+
+_CROC_VERSION_OUTPUT_RE = re.compile(
+    r"croc\s+version\s+v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.]+)*)",
+    re.IGNORECASE,
+)
+_BARE_CROC_VERSION_RE = re.compile(r"v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.]+)*)\Z")
 
 # Unset sentinels — Gator omits these flags and lets croc use its own defaults.
 DEFAULT_PORT = 0
@@ -97,6 +110,89 @@ DEFAULTS: dict[str, Any] = {
     "disable_clipboard": False,
     "extended_clipboard": False,
 }
+
+
+def parse_croc_version_output(output: str) -> str | None:
+    """Return the bare version from ``croc --version`` text, or None.
+
+    ``croc version v11.6.6`` and ``croc version 11.6.6`` both yield ``11.6.6``.
+    """
+    if not output:
+        return None
+    match = _CROC_VERSION_OUTPUT_RE.search(output)
+    if match is None:
+        return None
+    return match.group(1)
+
+
+def _bare_croc_version(version: str) -> str | None:
+    match = _BARE_CROC_VERSION_RE.fullmatch(version.strip())
+    if match is None:
+        return None
+    return match.group(1)
+
+
+def set_runtime_croc_version(version: str | None) -> None:
+    """Remember the version reported by the croc binary currently on PATH.
+
+    Accepts a bare ``11.6.6`` / ``v11.6.6`` or a full ``croc --version`` line.
+    Pass None (or unparseable text) to clear the cache so About uses the pin.
+    """
+    global _runtime_croc_version
+    if not version or not version.strip():
+        _runtime_croc_version = None
+        return
+    parsed = parse_croc_version_output(version) or _bare_croc_version(version)
+    _runtime_croc_version = parsed
+
+
+def get_runtime_croc_version() -> str | None:
+    """Bare runtime version, or None if croc has not been probed successfully."""
+    return _runtime_croc_version
+
+
+def format_croc_version_label(version: str | None = None) -> str:
+    """Visible About label such as ``croc v11.6.6``.
+
+    *version* may be omitted (use the runtime cache), a bare version, or the
+    full ``croc --version`` text. Missing or unparseable input uses the pin.
+    """
+    if version is None:
+        version = _runtime_croc_version
+    text = (version or "").strip()
+    parsed = parse_croc_version_output(text) if text else None
+    if parsed is None and text:
+        parsed = _bare_croc_version(text)
+    if not parsed:
+        parsed = BUNDLED_CROC_VERSION
+    return f"croc v{parsed}"
+
+
+def croc_version_label() -> str:
+    """About label for the croc binary in use, or the bundled pin."""
+    return format_croc_version_label(_runtime_croc_version)
+
+
+def about_comments(summary: str, croc_label: str | None = None) -> str:
+    """About comments: the marketing line, then ``croc vX.Y.Z`` on its own line."""
+    label = croc_label if croc_label is not None else croc_version_label()
+    return f"{summary.rstrip()}\n{label}"
+
+
+def about_debug_info(
+    app_version: str,
+    qr_generate: bool,
+    qr_scan: bool,
+    croc_label: str | None = None,
+) -> str:
+    """Debug-info block, including the same croc version line shown in comments."""
+    label = croc_label if croc_label is not None else croc_version_label()
+    return (
+        f"Gator {app_version}\n"
+        f"{label}\n"
+        f"QR generate: {qr_generate}\n"
+        f"QR scan: {qr_scan}\n"
+    )
 
 
 def get_config_dir() -> Path:

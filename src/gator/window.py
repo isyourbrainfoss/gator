@@ -15,7 +15,13 @@ from .a11y import set_a11y_label
 from .i18n import _
 from .receive_page import ReceivePage
 from .send_page import SendPage
-from .settings import APP_NAME, CROC_BINARY
+from .settings import (
+    APP_NAME,
+    CROC_BINARY,
+    get_runtime_croc_version,
+    parse_croc_version_output,
+    set_runtime_croc_version,
+)
 
 if TYPE_CHECKING:
     from .settings import GatorSettings
@@ -207,34 +213,100 @@ class GatorWindow(Adw.ApplicationWindow):
             self.receive_page.set_save_dir_subtitle(path)
 
 
+# Latest `croc --version` probe. About can subscribe while one is in flight.
+_croc_probe_generation = 0
+_croc_probe_pending = False
+_croc_version_listeners: list[Callable[[str | None], None]] = []
+
+
+def watch_croc_version(callback: Callable[[str | None], None]) -> None:
+    """Call *callback* with the bare runtime version once the current probe ends.
+
+    The callback runs on the main loop. ``None`` means the binary is missing
+    or the version line could not be parsed; the caller keeps the bundled pin.
+    If no probe is running, the callback is scheduled idle with the cache.
+    """
+    if not _croc_probe_pending:
+        version = get_runtime_croc_version()
+
+        def once(found: str | None) -> bool:
+            callback(found)
+            return False
+
+        GLib.idle_add(once, version)
+        return
+    _croc_version_listeners.append(callback)
+
+
+def _settle_croc_probe(generation: int, *, ok: bool, output: str) -> None:
+    """Store the probed version and wake About listeners for this generation."""
+    global _croc_probe_pending
+    if generation != _croc_probe_generation:
+        return
+    parsed = parse_croc_version_output(output) if ok else None
+    set_runtime_croc_version(parsed)
+    _croc_probe_pending = False
+    listeners = list(_croc_version_listeners)
+    _croc_version_listeners.clear()
+    version = get_runtime_croc_version()
+    for listener in listeners:
+        listener(version)
+
+
 def check_croc_available(callback: Callable[[bool], None]) -> None:
-    """Check for croc binary without blocking the main loop."""
-    flags = Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE
+    """Check for the croc binary without blocking the main loop.
+
+    Also caches the version printed by ``croc --version`` (stdout or stderr)
+    so About can show ``croc vX.Y.Z`` for the binary actually in use.
+    """
+    global _croc_probe_generation, _croc_probe_pending
+    _croc_probe_generation += 1
+    generation = _croc_probe_generation
+    _croc_probe_pending = True
+
+    flags = Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
     launcher = Gio.SubprocessLauncher.new(flags)
     try:
         proc = launcher.spawnv([CROC_BINARY, "--version"])
     except GLib.Error:
+        _settle_croc_probe(generation, ok=False, output="")
         GLib.idle_add(callback, False)
         return
 
-    def on_wait(_proc: Gio.Subprocess, result: Gio.AsyncResult) -> None:
+    timeout_id = 0
+
+    def clear_timeout() -> None:
+        nonlocal timeout_id
+        if timeout_id:
+            GLib.source_remove(timeout_id)
+            timeout_id = 0
+
+    def on_communicate(_proc: Gio.Subprocess, result: Gio.AsyncResult) -> None:
+        clear_timeout()
+        output = ""
+        ok = False
         try:
-            _proc.wait_finish(result)
-            ok = (
-                bool(_proc.get_successful())
-                if hasattr(_proc, "get_successful")
-                else True
-            )
-            GLib.idle_add(callback, ok)
+            success, stdout, stderr = _proc.communicate_utf8_finish(result)
+            output = f"{stdout or ''}\n{stderr or ''}"
+            if hasattr(_proc, "get_successful"):
+                ok = bool(_proc.get_successful())
+            else:
+                ok = bool(success)
         except GLib.Error:
-            GLib.idle_add(callback, False)
+            ok = False
+        if generation != _croc_probe_generation:
+            return
+        _settle_croc_probe(generation, ok=ok, output=output)
+        GLib.idle_add(callback, ok)
 
     def timeout_kill() -> bool:
+        nonlocal timeout_id
+        timeout_id = 0
         try:
             proc.force_exit()
         except GLib.Error:
             pass
         return False
 
-    GLib.timeout_add_seconds(5, timeout_kill)
-    proc.wait_async(None, on_wait)
+    timeout_id = GLib.timeout_add_seconds(5, timeout_kill)
+    proc.communicate_utf8_async(None, None, on_communicate)

@@ -235,6 +235,19 @@ def is_receive_file_indicator(line: str) -> bool:
     return False
 
 
+def _strip_posix_single_quotes(token: str) -> str:
+    """Drop POSIX single quotes around one shell token.
+
+    croc 11.6.6 quotes a receive-command word only when it contains shell
+    metacharacters (``croc 'my-code!'``). A matching pair is removed, and a
+    POSIX ``'\\''`` escape becomes a single quote. Quoted words that contain
+    spaces are not reassembled.
+    """
+    if len(token) < 2 or not token.startswith("'") or not token.endswith("'"):
+        return token
+    return token[1:-1].replace("'\\''", "'")
+
+
 def _code_from_croc_instruction(line: str) -> str | None:
     """Parse ``croc [--flags] SECRET`` from croc 11.5 send instructions."""
     cleaned = _TRAILING_PAREN_RE.sub("", line).strip()
@@ -260,7 +273,7 @@ def _code_from_croc_instruction(line: str) -> str | None:
         break
     if i >= len(parts):
         return None
-    candidate = parts[i]
+    candidate = _strip_posix_single_quotes(parts[i])
     if candidate.lower() in _CROC_SUBCOMMANDS:
         return None
     return candidate or None

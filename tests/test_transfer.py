@@ -347,6 +347,18 @@ def test_extract_send_code_case_insensitive():
     )
     assert extract_send_code("croc send file.txt") is None
     assert extract_send_code("On the other computer, run:") is None
+    # croc 11.6.6 quotes words that contain shell metacharacters.
+    assert extract_send_code("  croc 'my-code!'") == "my-code!"
+    assert extract_send_code("  croc --pass 'foo&bar' 'barn-boxer!'") == "barn-boxer!"
+    assert (
+        extract_send_code("  croc --relay '[::1]:9009' film-alibi-jet")
+        == "film-alibi-jet"
+    )
+    assert (
+        extract_send_code("  croc 'film-alibi-jet' (code copied to clipboard)")
+        == "film-alibi-jet"
+    )
+    assert extract_send_code("  croc 'it'\\''s-ok'") == "it's-ok"
 
 
 def test_classify_croc_error():

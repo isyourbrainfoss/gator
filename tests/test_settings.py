@@ -19,6 +19,78 @@ def test_defaults_present():
     assert S.DEFAULTS["rename"] is False
 
 
+def test_bundled_croc_version_pin():
+    assert S.BUNDLED_CROC_VERSION == "11.6.6"
+    root = Path(__file__).resolve().parents[1]
+    archive = (
+        "https://github.com/schollz/croc/archive/refs/tags/"
+        f"v{S.BUNDLED_CROC_VERSION}.tar.gz"
+    )
+    sha = "7b70ea161a1d6343b4499c81280d9650fadb1c298d3be96bbc54a2e8d8cd0c21"
+    for name in ("org.gator.Gator.yml", "org.gator.Gator.devel.yml"):
+        text = (root / name).read_text()
+        assert archive in text
+        assert sha in text
+    ci = (root / ".github/workflows/ci.yml").read_text()
+    tarball = f"croc_v{S.BUNDLED_CROC_VERSION}_Linux-64bit.tar.gz"
+    assert tarball in ci
+    assert f"download/v{S.BUNDLED_CROC_VERSION}/{tarball}" in ci
+
+
+def test_parse_croc_version_output():
+    assert S.parse_croc_version_output("croc version v11.6.6\n") == "11.6.6"
+    assert S.parse_croc_version_output("croc version 11.6.6") == "11.6.6"
+    assert S.parse_croc_version_output("  croc version v11.6.6  ") == "11.6.6"
+    assert S.parse_croc_version_output("croc version v11.6.6-1-gabcdef") == (
+        "11.6.6-1-gabcdef"
+    )
+    assert S.parse_croc_version_output("") is None
+    assert S.parse_croc_version_output("croc: command not found") is None
+
+
+def test_format_croc_version_label():
+    S.set_runtime_croc_version(None)
+    assert S.format_croc_version_label("croc version v11.6.6") == "croc v11.6.6"
+    assert S.format_croc_version_label("croc version 11.6.6\n") == "croc v11.6.6"
+    assert S.format_croc_version_label("11.6.5") == "croc v11.6.5"
+    assert S.format_croc_version_label("v11.6.5") == "croc v11.6.5"
+    assert S.format_croc_version_label(None) == f"croc v{S.BUNDLED_CROC_VERSION}"
+    assert S.format_croc_version_label("") == f"croc v{S.BUNDLED_CROC_VERSION}"
+    assert S.format_croc_version_label("not a version") == (
+        f"croc v{S.BUNDLED_CROC_VERSION}"
+    )
+
+
+def test_runtime_croc_version_overrides_pin():
+    S.set_runtime_croc_version(None)
+    try:
+        assert S.get_runtime_croc_version() is None
+        assert S.croc_version_label() == "croc v11.6.6"
+        S.set_runtime_croc_version("croc version v11.6.5")
+        assert S.get_runtime_croc_version() == "11.6.5"
+        assert S.croc_version_label() == "croc v11.6.5"
+        S.set_runtime_croc_version("not croc")
+        assert S.get_runtime_croc_version() is None
+        assert S.croc_version_label() == "croc v11.6.6"
+    finally:
+        S.set_runtime_croc_version(None)
+
+
+def test_about_text_includes_croc_version():
+    comments = S.about_comments("Secure file transfer made beautiful", "croc v11.6.6")
+    assert comments == "Secure file transfer made beautiful\ncroc v11.6.6"
+    assert comments.splitlines()[-1] == "croc v11.6.6"
+    debug = S.about_debug_info("1.6.4", True, False, "croc v11.6.6")
+    assert "Gator 1.6.4\n" in debug
+    assert "croc v11.6.6\n" in debug
+    assert "QR generate: True\n" in debug
+    assert "QR scan: False\n" in debug
+    # No runtime probe yet: comments and debug fall back to the pin.
+    S.set_runtime_croc_version(None)
+    assert S.about_comments("Hello").endswith("\ncroc v11.6.6")
+    assert "croc v11.6.6" in S.about_debug_info("1.6.4", False, False)
+
+
 def test_app_version_matches_project_metadata():
     """About dialog version must track meson.build / pyproject.toml."""
     import re

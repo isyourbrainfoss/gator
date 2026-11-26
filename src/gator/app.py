@@ -32,6 +32,10 @@ from .settings import (
     APP_NAME,
     APP_VERSION,
     GatorSettings,
+    about_comments,
+    about_debug_info,
+    croc_version_label,
+    format_croc_version_label,
     get_default_save_dir,
 )
 from .theme import load_app_css, qr_colors_for_widget
@@ -48,7 +52,7 @@ from .transfer import (
     CrocSendTransfer,
     normalize_croc_code,
 )
-from .window import GatorWindow, check_croc_available
+from .window import GatorWindow, check_croc_available, watch_croc_version
 
 logger = logging.getLogger(__name__)
 
@@ -362,15 +366,15 @@ class GatorApp(Adw.Application):
         self.add_toast(_("Settings reset to default"))
 
     def show_about(self, *_args: Any) -> None:
-        comments = _(
+        summary = _(
             "Modern GTK4/Libadwaita frontend for croc – "
             "secure file transfer made beautiful"
         )
-        debug = (
-            f"Gator {APP_VERSION}\n"
-            f"QR generate: {HAS_QR_GEN}\n"
-            f"QR scan: {HAS_QR_SCAN}\n"
-        )
+        # Pin is shown immediately. A probe still in flight replaces it with
+        # the version `croc --version` actually printed.
+        label = croc_version_label()
+        comments = about_comments(summary, label)
+        debug = about_debug_info(APP_VERSION, HAS_QR_GEN, HAS_QR_SCAN, label)
         kwargs: dict[str, Any] = {
             "application_name": APP_NAME,
             "version": APP_VERSION,
@@ -384,14 +388,33 @@ class GatorApp(Adw.Application):
             "developers": ["Gator Contributors"],
             "designers": ["Gator Contributors"],
         }
-        if hasattr(Adw, "AboutDialog"):
-            about = Adw.AboutDialog(**kwargs)
+
+        def bind(about: Any) -> None:
             if hasattr(about, "set_debug_info"):
                 about.set_debug_info(debug)
+
+            def apply_version(version: str | None) -> None:
+                if not version:
+                    return
+                updated = format_croc_version_label(version)
+                if updated == label:
+                    return
+                about.set_comments(about_comments(summary, updated))
+                if hasattr(about, "set_debug_info"):
+                    about.set_debug_info(
+                        about_debug_info(APP_VERSION, HAS_QR_GEN, HAS_QR_SCAN, updated)
+                    )
+
+            watch_croc_version(apply_version)
+
+        if hasattr(Adw, "AboutDialog"):
+            about = Adw.AboutDialog(**kwargs)
+            bind(about)
             about.present(self.win)
             return
         about = Adw.AboutWindow(**kwargs)
         about.set_transient_for(self.win)
+        bind(about)
         about.present()
 
     def _update_file_list(self) -> None:

@@ -12,7 +12,7 @@ Core app, Flatpak, and CI are in place. **v1.6.2** bundles croc 11.5.4 and parse
 - Modular GTK4/libadwaita app (`app`, `window`, pages, `transfer`, `settings`, `preferences`)
 - `Gio.Subprocess` transfers with `\r`/`\n` progress parsing
 - GSettings + JSON fallback; empty croc defaults + legacy relay migration
-- Flatpak bundles croc **v11.6.5**; GitHub Pages repo (x86_64 + aarch64)
+- Flatpak bundles croc **v11.6.6**; GitHub Pages repo (x86_64 + aarch64)
 - Meson, desktop, metainfo, CI (black/ruff/mypy/pytest)
 - Unit tests: settings, transfer, qr, theme
 
@@ -43,6 +43,11 @@ Core app, Flatpak, and CI are in place. **v1.6.2** bundles croc 11.5.4 and parse
 - [x] Keyboard shortcuts, desktop notifications when unfocused, a11y `update_property`
 - [x] Preferences: editable rows, reset confirmation, hash `highway`/`xxhash`
 - [x] Version strings synced to 1.6.0
+
+### Unreleased — croc 11.6.6
+- [x] Bundled croc 11.6.5 → **11.6.6** (CROC_WEB_URL; shell-quote relay/password/code in the printed receive command only when they contain shell metacharacters; throttleUpload validation; digit 9 in random pins; git-ignore relative paths; preserve empty file permissions; bundle byte counting; Prompt option; skip NTFS junctions; dependency updates; no send/receive flag or default output breaking changes)
+- [x] About dialog shows `croc v…` from `croc --version`, falling back to the bundled pin
+- [x] Quoted custom codes in the 11.6.6 receive command still extract (strip POSIX single quotes from the code token)
 
 ### Unreleased — croc 11.6.5
 - [x] Bundled croc 11.6.2 → **11.6.5** (11.6.3/11.6.5 dependency updates; 11.6.4 hardens transfers/limiters, adds `--no-update-check`, fixes `1024.0 kB` size rounding; no send/receive flag or output breaking changes)
@@ -107,7 +112,7 @@ Debug: `GATOR_LOG=1 flatpak run org.gator.Gator`
 |------|-----------|
 | Honest outcomes | Invalid code / failed croc never shows success checkmarks or “Transfer finished” |
 | Custom codes | Prefs custom code ≥ 6 chars starts a send; receiver uses the same phrase |
-| croc 11.6.5 | `flatpak run --command=croc org.gator.Gator --version` reports 11.6.5 |
+| croc 11.6.6 | `flatpak run --command=croc org.gator.Gator --version` reports 11.6.6 |
 | 11.5 parser | Send instructions, progress bars, and receive status lines parse without a `Code is:` line |
 | Secrets | Shell log never contains `--pass` or `--text` values |
 | Temp files | `pytest tests/test_transfer.py` leaves no `croc-stdin-*` in the repo root |
